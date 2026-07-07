@@ -153,7 +153,7 @@ export function MapPage() {
   const handleEmbed = (id: string) => {
     const url = `${window.location.origin}${window.location.pathname}?alert=${id}&embed=1`;
     setEmbedCode(
-      `<iframe src="${url}" width="100%" height="420" style="border:1px solid #263029;border-radius:8px" loading="lazy" title="Simontini deforestation alert ${id}"></iframe>`,
+      `<iframe src="${url}" width="100%" style="aspect-ratio:16/9;border:1px solid #263029;border-radius:8px" loading="lazy" title="Simontini deforestation alert ${id}"></iframe>`,
     );
     setEmbedOpen(true);
   };
