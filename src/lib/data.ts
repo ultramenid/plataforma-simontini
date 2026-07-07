@@ -260,6 +260,31 @@ const RAW_ALERTS: AlertBase[] = [
         "If the pattern holds, burning follows land clearing within six to ten weeks — well inside this year’s dry season window.",
       ],
     },
+    media: [
+      {
+        outlet: "Mongabay",
+        title:
+          "Clearing detected inside Tesso Nilo buffer as dry season approaches",
+        url: "https://news.mongabay.com/2026/07/tesso-nilo-buffer-clearing",
+        date: "2026-07-04",
+        excerpt:
+          "Satellite alerts show 400+ hectares cleared inside the park’s buffer zone, on land mapped as smallholder allocation.",
+      },
+      {
+        outlet: "Tempo",
+        title: "Izin diperluas tanpa persetujuan, hutan penyangga Tesso Nilo dibuka",
+        url: "https://www.tempo.co/lingkungan/tesso-nilo-2026",
+        date: "2026-07-05",
+      },
+      {
+        outlet: "Eyes on the Forest",
+        title: "Field investigation: excavators enter from northeast logging road",
+        url: "https://eyesontheforest.or.id/reports/tesso-nilo-june-2026",
+        date: "2026-06-30",
+        excerpt:
+          "Investigators documented heavy machinery and fresh canal works matching the alert footprint.",
+      },
+    ],
   },
   {
     id: "ID-KALTENG-2456",
@@ -300,6 +325,22 @@ const RAW_ALERTS: AlertBase[] = [
         "The block lies entirely inside the national peatland moratorium map, which should bar any new licensing. The company holds a location permit issued by the district before the moratorium — a loophole contested in court since 2023.",
       ],
     },
+    media: [
+      {
+        outlet: "BBC Indonesia",
+        title: "Kanal baru membelah kubah gambut di Kotawaringin Timur",
+        url: "https://www.bbc.com/indonesia/articles/kubah-gambut-2026",
+        date: "2026-07-01",
+        excerpt:
+          "Citra radar menunjukkan penggalian kanal di kawasan moratorium gambut nasional.",
+      },
+      {
+        outlet: "Pantau Gambut",
+        title: "PIPPIB violation flagged: full-overlap conversion on deep peat",
+        url: "https://pantaugambut.id/kabar/kotim-pippib-2026",
+        date: "2026-06-30",
+      },
+    ],
   },
   {
     id: "ID-PAPUA-2390",
@@ -344,6 +385,28 @@ const RAW_ALERTS: AlertBase[] = [
         "Auyu clans have petitioned since 2022 for the permits to be revoked, arguing consent was never given. Clearing accelerated after a 2025 appellate ruling returned two of seven blocks to the developer.",
       ],
     },
+    media: [
+      {
+        outlet: "The Gecko Project",
+        title: "Tanah Merah block D clearing resumes after appellate ruling",
+        url: "https://thegeckoproject.org/tanah-merah-block-d-2026",
+        date: "2026-06-27",
+        excerpt:
+          "The contested mega-plantation moves into primary forest claimed by Auyu clans, despite an unresolved FPIC dispute.",
+      },
+      {
+        outlet: "Jubi",
+        title: "Marga Auyu tolak pembukaan hutan adat di Boven Digoel",
+        url: "https://jubi.id/tanah-papua/auyu-boven-digoel-2026",
+        date: "2026-06-26",
+      },
+      {
+        outlet: "Mongabay",
+        title: "Largest deforestation alert of the quarter hits Papua frontier",
+        url: "https://news.mongabay.com/2026/06/papua-frontier-alert",
+        date: "2026-06-29",
+      },
+    ],
   },
   {
     id: "MY-SARAWAK-1877",
@@ -487,6 +550,16 @@ const RAW_ALERTS: AlertBase[] = [
         "A third of the alert footprint falls inside Dong Ampham, one of the least-surveyed protected areas in the Annamites.",
       ],
     },
+    media: [
+      {
+        outlet: "Radio Free Asia",
+        title: "Ghost concession keeps clearing forest in Attapeu after lease expiry",
+        url: "https://www.rfa.org/english/laos/attapeu-concession-2026",
+        date: "2026-07-02",
+        excerpt:
+          "Villagers say company machinery never left after the 2024 expiry of the economic land concession.",
+      },
+    ],
   },
   {
     id: "KH-MONDULKIRI-0788",
@@ -644,6 +717,22 @@ const RAW_ALERTS: AlertBase[] = [
         "The tenement overlaps a titled ancestral domain; the NCIP certification the permit relies on is under review after community petitions in late 2025.",
       ],
     },
+    media: [
+      {
+        outlet: "Rappler",
+        title: "Nickel test pits appear upstream of Brooke’s Point rice farms",
+        url: "https://www.rappler.com/environment/palawan-nickel-2026",
+        date: "2026-07-03",
+        excerpt:
+          "Residents fear siltation of irrigation systems fed by the Mantalingahan watershed.",
+      },
+      {
+        outlet: "Palawan News",
+        title: "NCIP review of MPSA 128-2023 certification still pending",
+        url: "https://palawan-news.com/mpsa-128-review-2026",
+        date: "2026-06-30",
+      },
+    ],
   },
   {
     id: "ID-ACEH-2502",
@@ -802,6 +891,52 @@ export function monthFromIdx(i: number): string {
 export function getAlert(id: string | null | undefined): Alert | undefined {
   if (!id) return undefined;
   return ALERTS.find((a) => a.id === id);
+}
+
+function haversineKm(a: Alert, b: Alert): number {
+  const R = 6371;
+  const rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad;
+  const dLng = (b.lng - a.lng) * rad;
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+export interface RelatedAlert {
+  alert: Alert;
+  relation: string;
+  km: number;
+}
+
+/** Other alerts ranked by shared administrative level (district > province >
+    country), ties broken by distance. */
+export function relatedAlerts(a: Alert, max = 3): RelatedAlert[] {
+  return ALERTS.filter((o) => o.id !== a.id)
+    .map((o) => {
+      const km = haversineKm(a, o);
+      const rank =
+        o.district && o.district === a.district && o.province === a.province
+          ? 0
+          : o.province && o.province === a.province
+            ? 1
+            : o.country === a.country
+              ? 2
+              : 3;
+      const relation =
+        rank === 0
+          ? `Same district · ${o.district}`
+          : rank === 1
+            ? `Same province · ${o.province}`
+            : rank === 2
+              ? `Same country · ${o.country}`
+              : `${Math.round(km)} km away`;
+      return { alert: o, relation, km, rank };
+    })
+    .sort((x, y) => x.rank - y.rank || x.km - y.km)
+    .slice(0, max)
+    .map(({ alert, relation, km }) => ({ alert, relation, km }));
 }
 
 export function fmtDate(d: string): string {

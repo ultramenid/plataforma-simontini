@@ -27,6 +27,14 @@ export interface AlertStory {
   body: string[];
 }
 
+export interface MediaArticle {
+  outlet: string;
+  title: string;
+  url: string;
+  date: string;
+  excerpt?: string;
+}
+
 export interface Polygon {
   type: "Polygon";
   coordinates: number[][][];
@@ -53,6 +61,7 @@ export interface AlertBase {
   crosscut: CrosscutItem[];
   crossings: Crossing[];
   story: AlertStory | null;
+  media?: MediaArticle[];
 }
 
 export interface Alert extends AlertBase {
