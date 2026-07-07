@@ -167,7 +167,7 @@ export function MapPage() {
           "grid h-screen grid-rows-[minmax(0,1fr)] overflow-hidden",
           embed
             ? activeAlert
-              ? "grid-cols-[300px_1fr]"
+              ? "grid-cols-1 grid-rows-[minmax(0,1fr)_auto]"
               : "grid-cols-1"
             : "grid-cols-[300px_1fr] max-md:grid-cols-1 max-md:grid-rows-[50px_1fr]",
         )}
@@ -187,15 +187,6 @@ export function MapPage() {
             onReset={handleReset}
           />
         </Sidebar>
-
-        {embed && (
-          <AlertCard
-            alert={activeAlert ?? null}
-            embed
-            onClose={() => setActiveId(null)}
-            onEmbed={handleEmbed}
-          />
-        )}
 
         <div className="relative h-full w-full min-w-0">
           <MapView
@@ -220,6 +211,15 @@ export function MapPage() {
             </>
           )}
         </div>
+
+        {embed && (
+          <AlertCard
+            alert={activeAlert ?? null}
+            embed
+            onClose={() => setActiveId(null)}
+            onEmbed={handleEmbed}
+          />
+        )}
       </div>
 
       <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>

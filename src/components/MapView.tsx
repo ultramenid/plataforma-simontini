@@ -91,7 +91,7 @@ export function MapView({
       new LngLatBounds(first, first),
     );
     map.fitBounds(bounds, {
-      padding: 120,
+      padding: embed ? 60 : 120,
       duration: instant ? 0 : 1400,
       maxZoom: 12,
     });
