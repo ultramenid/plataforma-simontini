@@ -204,37 +204,41 @@ function EmbedBar({
   copied: boolean;
   onShare: () => void;
 }) {
+  // Hairline divider between sections; only when the bar is wide enough to
+  // stay on one row, so wrapped sections don't carry a stray left border.
+  const divider = "min-[1000px]:border-l min-[1000px]:border-line min-[1000px]:pl-6";
+
   return (
     <div
       role="region"
       aria-label="Alert summary"
-      className="glass z-10 flex items-stretch gap-5 border-t-2 border-canopy px-4 py-3"
+      className="glass z-10 flex flex-wrap items-center gap-x-6 gap-y-3 border-t-2 border-canopy px-4 py-3"
     >
       <BeforeAfterCompare
         before={alert.before}
         after={alert.after}
         beforeLabel="Before · 2025"
         afterLabel={`After · ${alert.date.slice(0, 4)}`}
-        className="w-60 shrink-0 self-center"
+        className="w-60 max-w-full shrink-0"
       />
 
-      <div className="shrink-0 self-center">
-        <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-          <Fact k="Code" v={alert.id} />
-          <Fact k="Area" v={`${alert.ha.toLocaleString()} ha`} />
-          <Fact k="Islands" v={alert.island || "—"} />
-          <Fact k="Provinces" v={alert.province || "—"} />
-          <Fact k="Districts" v={alert.district || "—"} />
-          <Fact k="Original Source" v={alert.originalSource} />
-        </div>
-        <div className="mt-2.5 grid grid-cols-2 gap-x-6">
-          <DateCell k="Detected" v={fmtDate(alert.date)} />
-          <DateCell k="Published" v={fmtDate(alert.publishedDate)} />
-        </div>
+      <div
+        className={`grid shrink-0 grid-cols-2 content-center gap-x-6 gap-y-2.5 self-stretch ${divider}`}
+      >
+        <Fact k="Code" v={alert.id} />
+        <Fact k="Area" v={`${alert.ha.toLocaleString()} ha`} />
+        <Fact k="Islands" v={alert.island || "—"} />
+        <Fact k="Provinces" v={alert.province || "—"} />
+        <Fact k="Districts" v={alert.district || "—"} />
+        <Fact k="Original Source" v={alert.originalSource} />
+        <Fact k="Detected" v={fmtDate(alert.date)} />
+        <Fact k="Published" v={fmtDate(alert.publishedDate)} />
       </div>
 
-      <div className="min-w-0 flex-1 self-center">
-        <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.05em] text-canopy">
+      <div
+        className={`flex min-w-[240px] flex-1 flex-col justify-center self-stretch ${divider}`}
+      >
+        <div className="mb-1.5 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.05em] text-canopy">
           Alert crossings
         </div>
         {/* max-h fits the 4 crossings every alert has today; scroll is a backstop */}
@@ -245,14 +249,16 @@ function EmbedBar({
         </ul>
       </div>
 
-      <div className="flex shrink-0 flex-col justify-center gap-2 self-center">
-        <Button asChild className="text-[11px]">
+      <div
+        className={`flex w-[132px] shrink-0 flex-col justify-center gap-2 self-stretch ${divider} min-[1000px]:w-[156px]`}
+      >
+        <Button asChild className="w-full text-[11px]">
           <Link to={`/alert/${alert.id}`} target="_blank">
             <FileText className="size-3" />
             Open report
           </Link>
         </Button>
-        <Button variant="outline" onClick={onShare} className="text-[11px]">
+        <Button variant="outline" onClick={onShare} className="w-full text-[11px]">
           {copied ? (
             <Check className="size-3 text-canopy" />
           ) : (
