@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simontini</title>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      // Apply the persisted theme before paint to avoid a flash of the wrong
+      // theme on refresh / deep-link. Mirrors ThemeProvider.readStoredTheme.
+      (function () {
+        try {
+          var raw = localStorage.getItem("simontini-theme");
+          var stored = raw === "light" || raw === "dark" ? raw : null;
+          var sysDark = window.matchMedia(
+            "(prefers-color-scheme: dark)",
+          ).matches;
+          var resolved = stored
+            ? stored
+            : sysDark
+              ? "dark"
+              : "light";
+          var root = document.documentElement;
+          root.classList.remove("light", "dark");
+          root.classList.add(resolved);
+          root.style.colorScheme = resolved;
+        } catch (e) {
+          /* storage unavailable; ThemeProvider will resolve on mount */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

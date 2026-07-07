@@ -1,0 +1,182 @@
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Check, Code, FileText, Share2, X } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { BeforeAfterCompare } from "@/components/BeforeAfterCompare";
+import { CROSSING_COLOR, fmtDate } from "@/lib/data";
+import type { Alert } from "@/lib/types";
+
+interface AlertCardProps {
+  alert: Alert | null;
+  embed: boolean;
+  onClose: () => void;
+  onEmbed: (id: string) => void;
+}
+
+function Fact({ k, v }: { k: string; v: string }) {
+  return (
+    <div>
+      <div className="mb-[3px] text-[10px] font-medium uppercase tracking-[0.04em] text-muted-foreground">
+        {k}
+      </div>
+      <div className="text-[13px] font-medium text-foreground">{v}</div>
+    </div>
+  );
+}
+
+function DateCell({ k, v }: { k: string; v: string }) {
+  return (
+    <div>
+      <span className="text-[10px] font-medium uppercase tracking-[0.04em] text-muted-foreground">
+        {k}
+      </span>
+      <div className="text-[10px] font-medium text-foreground">{v}</div>
+    </div>
+  );
+}
+
+export function AlertCard({ alert, embed, onClose, onEmbed }: AlertCardProps) {
+  const [copied, setCopied] = useState(false);
+  if (!alert) return null;
+
+  const shareUrl = `${window.location.origin}${window.location.pathname}?alert=${alert.id}`;
+
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+    } catch {
+      /* clipboard may be unavailable; the URL is still shown via embed */
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <div
+      role="region"
+      aria-label="Alert summary"
+      className="glass absolute bottom-2.5 left-2.5 z-10 w-80 max-w-[calc(100%-20px)] overflow-hidden rounded-[10px] border border-line shadow-[0_4px_14px_rgba(19,42,39,0.1)]"
+    >
+      <div className="flex items-center justify-between gap-2.5 border-b-2 border-canopy px-3 py-2.5">
+        <span className="flex-1 text-center text-sm font-semibold text-foreground">
+          Details
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="flex size-6 items-center justify-center text-[18px] leading-none text-muted-foreground hover:text-foreground"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+
+      <div className="p-3">
+        <div className="mb-3 grid grid-cols-2 gap-x-3 gap-y-2.5 text-xs">
+          <Fact k="Code" v={alert.id} />
+          <Fact k="Area" v={`${alert.ha.toLocaleString()} ha`} />
+          <Fact k="Islands" v={alert.island || "—"} />
+          <Fact k="Provinces" v={alert.province || "—"} />
+          <Fact k="Districts" v={alert.district || "—"} />
+          <Fact k="Original Source" v={alert.originalSource} />
+        </div>
+
+        <BeforeAfterCompare
+          before={alert.before}
+          after={alert.after}
+          beforeLabel="Before · 2025"
+          afterLabel={`After · ${alert.date.slice(0, 4)}`}
+          className="mb-3"
+        />
+
+        <div className="mb-3 grid grid-cols-2 gap-2 text-[10px] text-muted-foreground">
+          <DateCell k="Before" v="2025" />
+          <DateCell k="After" v={fmtDate(alert.date)} />
+        </div>
+        <div className="mb-3 grid grid-cols-2 gap-2 text-[10px] text-muted-foreground">
+          <DateCell k="Detected" v={fmtDate(alert.date)} />
+          <DateCell k="Published" v={fmtDate(alert.publishedDate)} />
+        </div>
+
+        <div className="mb-[8px] text-[10px] font-semibold uppercase tracking-[0.05em] text-canopy">
+          Alert crossings
+        </div>
+        <ul className="mb-3 list-none space-y-0 p-0 text-xs">
+          {alert.crossings.map((c, i) => (
+            <li
+              key={`${c.type}-${c.name}`}
+              className={`flex items-start gap-2 ${i === 0 ? "" : "border-t border-line"} ${i === 0 ? "pt-0" : "py-1.5"}`}
+            >
+              <span
+                className="mt-[3px] size-3 shrink-0 rounded-[2px]"
+                style={{
+                  background: CROSSING_COLOR[c.type] || "#8ea395",
+                }}
+              />
+              <div>
+                <span className="block font-semibold uppercase text-foreground">
+                  {c.type}
+                </span>
+                <span className="lowercase text-muted-foreground">{c.name}</span>
+              </div>
+              <span className="ml-auto whitespace-nowrap font-medium text-foreground">
+                {c.ha.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{" "}
+                ha
+              </span>
+            </li>
+          ))}
+        </ul>
+
+        <div className="flex items-center gap-2 border-t border-line pt-3">
+          <Button asChild className="flex-1 text-[11px]">
+            <Link to={`/alert/${alert.id}`} target={embed ? "_blank" : undefined}>
+              <FileText className="size-3" />
+              Open report
+            </Link>
+          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleShare}
+                className="size-9 text-muted-foreground hover:text-canopy"
+                aria-label="Share"
+              >
+                {copied ? (
+                  <Check className="size-4 text-canopy" />
+                ) : (
+                  <Share2 className="size-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{copied ? "Copied" : "Share"}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onEmbed(alert.id)}
+                className="size-9 text-muted-foreground hover:text-canopy"
+                aria-label="Embed"
+              >
+                <Code className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Embed</TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+    </div>
+  );
+}
