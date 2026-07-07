@@ -67,9 +67,11 @@ export function MapPage() {
   }, [embed]);
 
   // Esc: close the alert card; if already closed, reset everything.
+  // Disabled in embed mode — the embed stays locked on its alert.
   const activeIdRef = useRef(activeId);
   activeIdRef.current = activeId;
   useEffect(() => {
+    if (embed) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       // let open overlays handle their own Esc
@@ -85,7 +87,7 @@ export function MapPage() {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [cmdkOpen, embedOpen, mobileFiltersOpen]);
+  }, [cmdkOpen, embedOpen, mobileFiltersOpen, embed]);
 
   // Bumping resetToken resets both the map view (in MapView) and the
   // filter state. Kept here so the Esc handler only calls one setState.
@@ -191,6 +193,7 @@ export function MapPage() {
             basemap={basemap}
             theme={resolved}
             resetToken={resetToken}
+            embed={embed}
             onSelect={onSelectAlert}
           />
           {!embed && (

@@ -25,6 +25,7 @@ interface MapViewProps {
   basemap: BasemapKey;
   theme?: "light" | "dark";
   resetToken?: number;
+  embed?: boolean;
   onSelect: (id: string) => void;
 }
 
@@ -36,6 +37,7 @@ export function MapView({
   basemap,
   theme = "light",
   resetToken = 0,
+  embed = false,
   onSelect,
 }: MapViewProps) {
   const mapRef = useRef<MapRef>(null);
@@ -155,6 +157,25 @@ export function MapView({
   const satVisible = basemap === "sat";
   const alertsFC = { type: "FeatureCollection" as const, features };
 
+  // Embed mode: a static view locked on the alert — no gestures, no selection.
+  const interactionProps = embed
+    ? {
+        scrollZoom: false,
+        dragPan: false,
+        dragRotate: false,
+        doubleClickZoom: false,
+        touchZoomRotate: false,
+        touchPitch: false,
+        keyboard: false,
+        boxZoom: false,
+      }
+    : {
+        interactiveLayerIds: ["alerts-fill"],
+        onClick: onAlertClick,
+        onMouseEnter: onAlertEnter,
+        onMouseLeave: onAlertLeave,
+      };
+
   function onAlertClick(e: MapLayerMouseEvent) {
     const f = e.features?.[0];
     const id = f?.properties?.id;
@@ -189,15 +210,12 @@ export function MapView({
         mapStyle={BASEMAP_FOR_THEME(theme)}
         initialViewState={INITIAL_VIEW}
         minZoom={2}
-        interactiveLayerIds={["alerts-fill"]}
         onLoad={onMapLoad}
         onError={(e) => {
           setMapError(e.error.message);
           if (/webgl/i.test(e.error.message)) setWebglError(true);
         }}
-        onClick={onAlertClick}
-        onMouseEnter={onAlertEnter}
-        onMouseLeave={onAlertLeave}
+        {...interactionProps}
         style={{ position: "absolute", inset: 0 }}
       >
         <Source

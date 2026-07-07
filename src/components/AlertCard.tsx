@@ -61,23 +61,25 @@ export function AlertCard({ alert, embed, onClose, onEmbed }: AlertCardProps) {
     <div
       role="region"
       aria-label="Alert summary"
-      className="glass absolute bottom-2.5 left-2.5 z-10 w-80 max-w-[calc(100%-20px)] overflow-hidden rounded-[10px] border border-line shadow-[0_4px_14px_rgba(19,42,39,0.1)]"
+      className="glass absolute bottom-2.5 left-2.5 z-10 flex max-h-[calc(100%-20px)] w-80 max-w-[calc(100%-20px)] flex-col overflow-hidden rounded-[10px] border border-line shadow-[0_4px_14px_rgba(19,42,39,0.1)]"
     >
       <div className="flex items-center justify-between gap-2.5 border-b-2 border-canopy px-3 py-2.5">
         <span className="flex-1 text-center text-sm font-semibold text-foreground">
           Details
         </span>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="flex size-6 items-center justify-center text-[18px] leading-none text-muted-foreground hover:text-foreground"
-        >
-          <X className="size-4" />
-        </button>
+        {!embed && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="flex size-6 items-center justify-center text-[18px] leading-none text-muted-foreground hover:text-foreground"
+          >
+            <X className="size-4" />
+          </button>
+        )}
       </div>
 
-      <div className="p-3">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
         <div className="mb-3 grid grid-cols-2 gap-x-3 gap-y-2.5 text-xs">
           <Fact k="Code" v={alert.id} />
           <Fact k="Area" v={`${alert.ha.toLocaleString()} ha`} />
@@ -161,20 +163,22 @@ export function AlertCard({ alert, embed, onClose, onEmbed }: AlertCardProps) {
             </TooltipTrigger>
             <TooltipContent>{copied ? "Copied" : "Share"}</TooltipContent>
           </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onEmbed(alert.id)}
-                className="size-9 text-muted-foreground hover:text-canopy"
-                aria-label="Embed"
-              >
-                <Code className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Embed</TooltipContent>
-          </Tooltip>
+          {!embed && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onEmbed(alert.id)}
+                  className="size-9 text-muted-foreground hover:text-canopy"
+                  aria-label="Embed"
+                >
+                  <Code className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Embed</TooltipContent>
+            </Tooltip>
+          )}
         </div>
       </div>
     </div>
