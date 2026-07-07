@@ -11,6 +11,7 @@ import {
 import { BeforeAfterCompare } from "@/components/BeforeAfterCompare";
 import { CROSSING_COLOR, fmtDate } from "@/lib/data";
 import type { Alert } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface AlertCardProps {
   alert: Alert | null;
@@ -61,7 +62,12 @@ export function AlertCard({ alert, embed, onClose, onEmbed }: AlertCardProps) {
     <div
       role="region"
       aria-label="Alert summary"
-      className="glass absolute bottom-2.5 left-2.5 z-10 flex max-h-[calc(100%-20px)] w-80 max-w-[calc(100%-20px)] flex-col overflow-hidden rounded-[10px] border border-line shadow-[0_4px_14px_rgba(19,42,39,0.1)]"
+      className={cn(
+        "glass flex flex-col overflow-hidden border-line",
+        embed
+          ? "h-full w-full border-r"
+          : "absolute bottom-2.5 left-2.5 z-10 max-h-[calc(100%-20px)] w-80 max-w-[calc(100%-20px)] rounded-[10px] border shadow-[0_4px_14px_rgba(19,42,39,0.1)]",
+      )}
     >
       <div className="flex items-center justify-between gap-2.5 border-b-2 border-canopy px-3 py-2.5">
         <span className="flex-1 text-center text-sm font-semibold text-foreground">

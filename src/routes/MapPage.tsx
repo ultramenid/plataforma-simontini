@@ -155,7 +155,7 @@ export function MapPage() {
   const handleEmbed = (id: string) => {
     const url = `${window.location.origin}${window.location.pathname}?alert=${id}&embed=1`;
     setEmbedCode(
-      `<iframe src="${url}" width="100%" style="aspect-ratio:16/9;border:1px solid #263029;border-radius:8px" loading="lazy" title="Simontini deforestation alert ${id}"></iframe>`,
+      `<iframe src="${url}" width="1200" height="630" style="max-width:100%;border:1px solid #263029;border-radius:8px" loading="lazy" title="Simontini deforestation alert ${id}"></iframe>`,
     );
     setEmbedOpen(true);
   };
@@ -166,7 +166,9 @@ export function MapPage() {
         className={cn(
           "grid h-screen grid-rows-[minmax(0,1fr)] overflow-hidden",
           embed
-            ? "grid-cols-1"
+            ? activeAlert
+              ? "grid-cols-[300px_1fr]"
+              : "grid-cols-1"
             : "grid-cols-[300px_1fr] max-md:grid-cols-1 max-md:grid-rows-[50px_1fr]",
         )}
       >
@@ -186,6 +188,15 @@ export function MapPage() {
           />
         </Sidebar>
 
+        {embed && (
+          <AlertCard
+            alert={activeAlert ?? null}
+            embed
+            onClose={() => setActiveId(null)}
+            onEmbed={handleEmbed}
+          />
+        )}
+
         <div className="relative h-full w-full min-w-0">
           <MapView
             features={features}
@@ -197,15 +208,17 @@ export function MapPage() {
             onSelect={onSelectAlert}
           />
           {!embed && (
-            <MapSearch onOpenCommand={() => setCmdkOpen(true)} />
+            <>
+              <MapSearch onOpenCommand={() => setCmdkOpen(true)} />
+              <AlertCard
+                alert={activeAlert ?? null}
+                embed={false}
+                onClose={() => setActiveId(null)}
+                onEmbed={handleEmbed}
+              />
+              <EscHint active={!!activeId} resetToken={resetToken} />
+            </>
           )}
-          <AlertCard
-            alert={activeAlert ?? null}
-            embed={embed}
-            onClose={() => setActiveId(null)}
-            onEmbed={handleEmbed}
-          />
-          {!embed && <EscHint active={!!activeId} resetToken={resetToken} />}
         </div>
       </div>
 
