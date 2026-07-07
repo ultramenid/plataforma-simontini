@@ -28,13 +28,22 @@ function isTheme(v: unknown): v is Theme {
 
 function readStoredTheme(): Theme {
   if (typeof window === "undefined") return "system";
-  const raw = localStorage.getItem(STORAGE_KEY);
-  return isTheme(raw) ? raw : "system";
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return isTheme(raw) ? raw : "system";
+  } catch {
+    // localStorage may be unavailable (sandboxed iframe, private mode)
+    return "system";
+  }
 }
 
 function systemPrefersDark(): boolean {
   if (typeof window === "undefined") return false;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  try {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  } catch {
+    return false;
+  }
 }
 
 function resolveTheme(theme: Theme, sysDark: boolean): "light" | "dark" {
@@ -55,8 +64,17 @@ function applyResolved(resolved: "light" | "dark") {
  * rAF gap, adding the transition class and changing the value in the same
  * frame produces a snap/flicker instead of a transition.
  */
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    return false;
+  }
+}
+
 function withTransition(root: HTMLElement, fn: () => void) {
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  if (prefersReducedMotion()) {
     fn();
     return;
   }
@@ -81,7 +99,12 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
   // Track OS-level dark preference so `system` mode re-resolves live.
   useEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    let media: MediaQueryList;
+    try {
+      media = window.matchMedia("(prefers-color-scheme: dark)");
+    } catch {
+      return; // sandboxed iframe or unsupported; skip live tracking
+    }
     const listener = (e: MediaQueryListEvent) => {
       setSysDark(e.matches);
       if (theme !== "system") return;
