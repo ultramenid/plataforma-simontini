@@ -2,7 +2,7 @@
    Ported faithfully from the original data.js. TypeScript-typed.
    ponytail: static demo data; swap ALERTS for a GeoJSON API feed when backend exists. */
 
-import type { StyleSpecification } from "maplibre-gl";
+import { LngLatBounds, type StyleSpecification } from "maplibre-gl";
 
 import type {
   Alert,
@@ -14,13 +14,13 @@ import type {
   Severity,
 } from "@/lib/types";
 
-function mulberry32(a: number) {
+function mulberry32(seedState: number) {
   return function () {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    seedState |= 0;
+    seedState = (seedState + 0x6d2b79f5) | 0;
+    let mixed = Math.imul(seedState ^ (seedState >>> 15), 1 | seedState);
+    mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
   };
 }
 
@@ -31,16 +31,16 @@ function makePoly(
   seed: number,
   km: number,
 ): number[][][] {
-  const rnd = mulberry32(seed);
-  const n = 9 + Math.floor(rnd() * 4);
+  const randomFn = mulberry32(seed);
+  const vertexCount = 9 + Math.floor(randomFn() * 4);
   const rBase = km / 2 / 111; // degrees
   const ring: number[][] = [];
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2;
-    const r = rBase * (0.55 + rnd() * 0.9);
+  for (let i = 0; i < vertexCount; i++) {
+    const angle = (i / vertexCount) * Math.PI * 2;
+    const radius = rBase * (0.55 + randomFn() * 0.9);
     ring.push([
-      +(lng + (Math.cos(a) * r) / Math.cos((lat * Math.PI) / 180)).toFixed(5),
-      +(lat + Math.sin(a) * r).toFixed(5),
+      +(lng + (Math.cos(angle) * radius) / Math.cos((lat * Math.PI) / 180)).toFixed(5),
+      +(lat + Math.sin(angle) * radius).toFixed(5),
     ]);
   }
   ring.push(ring[0]);
@@ -49,30 +49,30 @@ function makePoly(
 
 // Project a lon/lat polygon ring onto a 640x400 canvas, centered and padded.
 function polyPath(ring: number[][], pad = 0.15): string {
-  const W = 640,
-    H = 400;
-  const xs = ring.map((c) => c[0]),
-    ys = ring.map((c) => c[1]);
-  const minX = Math.min(...xs),
-    maxX = Math.max(...xs);
-  const minY = Math.min(...ys),
-    maxY = Math.max(...ys);
-  const cw = maxX - minX,
-    ch = maxY - minY;
-  const padX = cw * pad,
-    padY = ch * pad;
-  const boxW = cw + padX * 2,
-    boxH = ch + padY * 2;
+  const canvasWidth = 640,
+    canvasHeight = 400;
+  const lngs = ring.map((coord) => coord[0]),
+    lats = ring.map((coord) => coord[1]);
+  const minX = Math.min(...lngs),
+    maxX = Math.max(...lngs);
+  const minY = Math.min(...lats),
+    maxY = Math.max(...lats);
+  const contentWidth = maxX - minX,
+    contentHeight = maxY - minY;
+  const padX = contentWidth * pad,
+    padY = contentHeight * pad;
+  const boxWidth = contentWidth + padX * 2,
+    boxHeight = contentHeight + padY * 2;
   // preserve aspect ratio, fit inside canvas
-  const scale = Math.min(W / boxW, H / boxH);
-  const offX = (W - cw * scale) / 2 - minX * scale;
-  const offY = (H - ch * scale) / 2 - minY * scale;
-  const flipY = (y: number) => H - (y * scale + offY);
+  const scale = Math.min(canvasWidth / boxWidth, canvasHeight / boxHeight);
+  const offX = (canvasWidth - contentWidth * scale) / 2 - minX * scale;
+  const offY = (canvasHeight - contentHeight * scale) / 2 - minY * scale;
+  const flipY = (y: number) => canvasHeight - (y * scale + offY);
   return (
     ring
       .map(
-        (c, i) =>
-          `${i ? "L" : "M"}${(c[0] * scale + offX).toFixed(1)} ${flipY(c[1]).toFixed(1)}`,
+        (coord, i) =>
+          `${i ? "L" : "M"}${(coord[0] * scale + offX).toFixed(1)} ${flipY(coord[1]).toFixed(1)}`,
       )
       .join(" ") + " Z"
   );
@@ -84,13 +84,13 @@ function satSVG(
   cleared: boolean,
   alertGeometry: Polygon,
 ): string {
-  const rnd = mulberry32(seed * 11 + (cleared ? 997 : 0));
-  const W = 640,
-    H = 400;
+  const randomFn = mulberry32(seed * 11 + (cleared ? 997 : 0));
+  const canvasWidth = 640,
+    canvasHeight = 400;
 
-  const riverY0 = H * (0.25 + rnd() * 0.4);
-  const riverControl = W * (0.25 + rnd() * 0.3);
-  const riverPath = `M-20 ${riverY0.toFixed(0)} C ${riverControl.toFixed(0)} ${(riverY0 + 55).toFixed(0)} ${(W - riverControl).toFixed(0)} ${(riverY0 - 50).toFixed(0)} ${W + 20} ${(riverY0 + 10).toFixed(0)}`;
+  const riverY0 = canvasHeight * (0.25 + randomFn() * 0.4);
+  const riverControl = canvasWidth * (0.25 + randomFn() * 0.3);
+  const riverPath = `M-20 ${riverY0.toFixed(0)} C ${riverControl.toFixed(0)} ${(riverY0 + 55).toFixed(0)} ${(canvasWidth - riverControl).toFixed(0)} ${(riverY0 - 50).toFixed(0)} ${canvasWidth + 20} ${(riverY0 + 10).toFixed(0)}`;
 
   const base = cleared ? "#4a3b28" : "#122b1a";
   const greens = [
@@ -122,33 +122,33 @@ function satSVG(
   const patchCount = cleared ? 32 : 70;
   let patches = "";
   for (let i = 0; i < patchCount; i++) {
-    const cx = rnd() * W,
-      cy = rnd() * H;
-    const baseR = 18 + rnd() * 55;
+    const cx = randomFn() * canvasWidth,
+      cy = randomFn() * canvasHeight;
+    const baseRadius = 18 + randomFn() * 55;
     const points: number[][] = [];
-    const n = 7 + Math.floor(rnd() * 5);
-    for (let j = 0; j < n; j++) {
-      const a = (j / n) * Math.PI * 2;
-      const r = baseR * (0.55 + rnd() * 0.75);
+    const vertexCount = 7 + Math.floor(randomFn() * 5);
+    for (let j = 0; j < vertexCount; j++) {
+      const angle = (j / vertexCount) * Math.PI * 2;
+      const radius = baseRadius * (0.55 + randomFn() * 0.75);
       points.push([
-        +(cx + Math.cos(a) * r).toFixed(1),
-        +(cy + Math.sin(a) * r).toFixed(1),
+        +(cx + Math.cos(angle) * radius).toFixed(1),
+        +(cy + Math.sin(angle) * radius).toFixed(1),
       ]);
     }
-    const d =
-      points.map((p, i) => (i ? "L" : "M") + p.join(",")).join(" ") + " Z";
+    const pathData =
+      points.map((point, i) => (i ? "L" : "M") + point.join(",")).join(" ") + " Z";
     const palette = cleared
-      ? rnd() < 0.22
+      ? randomFn() < 0.22
         ? greens
-        : rnd() < 0.18
+        : randomFn() < 0.18
           ? scars
           : browns
       : greens;
-    const fill = palette[Math.floor(rnd() * palette.length)];
+    const fill = palette[Math.floor(randomFn() * palette.length)];
     const op = cleared
-      ? (0.35 + rnd() * 0.45).toFixed(2)
-      : (0.4 + rnd() * 0.45).toFixed(2);
-    patches += `<path d="${d}" fill="${fill}" opacity="${op}" style="mix-blend-mode:multiply"/>`;
+      ? (0.35 + randomFn() * 0.45).toFixed(2)
+      : (0.4 + randomFn() * 0.45).toFixed(2);
+    patches += `<path d="${pathData}" fill="${fill}" opacity="${op}" style="mix-blend-mode:multiply"/>`;
   }
 
   let water = `<path d="${riverPath}" stroke="#2f4b52" stroke-width="12" fill="none" opacity="0.9"/>`;
@@ -157,44 +157,44 @@ function satSVG(
   let roads = "";
   const roadCount = cleared ? 9 : 1;
   for (let i = 0; i < roadCount; i++) {
-    let x = rnd() * W,
-      y = rnd() * H;
-    let d = `M${x.toFixed(0)} ${y.toFixed(0)}`;
-    const segs = 6 + Math.floor(rnd() * 6);
+    let x = randomFn() * canvasWidth,
+      y = randomFn() * canvasHeight;
+    let pathData = `M${x.toFixed(0)} ${y.toFixed(0)}`;
+    const segs = 6 + Math.floor(randomFn() * 6);
     for (let j = 0; j < segs; j++) {
-      x += (rnd() - 0.5) * 110;
-      y += (rnd() - 0.3) * 80;
-      d += ` L${x.toFixed(0)} ${y.toFixed(0)}`;
+      x += (randomFn() - 0.5) * 110;
+      y += (randomFn() - 0.3) * 80;
+      pathData += ` L${x.toFixed(0)} ${y.toFixed(0)}`;
     }
-    roads += `<path d="${d}" stroke="#cbb07e" stroke-width="${cleared ? (1.2 + rnd() * 1.8).toFixed(1) : 1}" fill="none" opacity="${cleared ? 0.75 : 0.35}" stroke-linecap="round"/>`;
-    if (cleared && rnd() < 0.5) {
-      roads += `<path d="${d}" stroke="#8f7650" stroke-width="${(2 + rnd() * 2).toFixed(1)}" fill="none" opacity="0.25" stroke-linecap="round" transform="translate(2,2)"/>`;
+    roads += `<path d="${pathData}" stroke="#cbb07e" stroke-width="${cleared ? (1.2 + randomFn() * 1.8).toFixed(1) : 1}" fill="none" opacity="${cleared ? 0.75 : 0.35}" stroke-linecap="round"/>`;
+    if (cleared && randomFn() < 0.5) {
+      roads += `<path d="${pathData}" stroke="#8f7650" stroke-width="${(2 + randomFn() * 2).toFixed(1)}" fill="none" opacity="0.25" stroke-linecap="round" transform="translate(2,2)"/>`;
     }
   }
 
   let burns = "";
   if (cleared) {
     for (let i = 0; i < 4; i++) {
-      const cx = rnd() * W,
-        cy = rnd() * H,
-        r = 20 + rnd() * 35;
-      burns += `<ellipse cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" rx="${r.toFixed(0)}" ry="${(r * 0.6).toFixed(0)}" fill="#2a1d10" opacity="${(0.25 + rnd() * 0.35).toFixed(2)}"/>`;
+      const cx = randomFn() * canvasWidth,
+        cy = randomFn() * canvasHeight,
+        radius = 20 + randomFn() * 35;
+      burns += `<ellipse cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" rx="${radius.toFixed(0)}" ry="${(radius * 0.6).toFixed(0)}" fill="#2a1d10" opacity="${(0.25 + randomFn() * 0.35).toFixed(2)}"/>`;
     }
   }
 
   // Alert polygon overlay so before/after clearly frames the loss.
   let overlay = "";
   if (alertGeometry) {
-    const p = polyPath(alertGeometry.coordinates[0]);
-    overlay = `<path d="${p}" fill="none" stroke="#ff5c39" stroke-width="2.5" stroke-linejoin="round"/>`;
-    overlay += `<path d="${p}" fill="#ff5c39" opacity="0.12"/>`;
+    const polyPathStr = polyPath(alertGeometry.coordinates[0]);
+    overlay = `<path d="${polyPathStr}" fill="none" stroke="#ff5c39" stroke-width="2.5" stroke-linejoin="round"/>`;
+    overlay += `<path d="${polyPathStr}" fill="#ff5c39" opacity="0.12"/>`;
   }
 
-  const s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${canvasHeight}" viewBox="0 0 ${canvasWidth} ${canvasHeight}">
     <defs>
       <filter
       id="n${seed}" x="0" y="0" width="100%" height="100%">
-        <feTurbulence type="fractalNoise" baseFrequency="${(0.008 + rnd() * 0.007).toFixed(4)}" numOctaves="4" seed="${Math.floor(rnd() * 99)}" stitchTiles="stitch" result="noise"/>
+        <feTurbulence type="fractalNoise" baseFrequency="${(0.008 + randomFn() * 0.007).toFixed(4)}" numOctaves="4" seed="${Math.floor(randomFn() * 99)}" stitchTiles="stitch" result="noise"/>
         <feColorMatrix type="saturate" values="0" in="noise" result="gray"/>
         <feComponentTransfer in="gray" result="contrast">
           <feFuncA type="linear" slope="0.35" intercept="-0.05"/>
@@ -203,11 +203,11 @@ function satSVG(
         <feBlend mode="overlay" in="textured" in2="SourceGraphic"/>
       </filter>
     </defs>
-    <rect width="${W}" height="${H}" fill="${base}"/>
+    <rect width="${canvasWidth}" height="${canvasHeight}" fill="${base}"/>
     <g filter="url(#n${seed})">${water}${patches}${roads}${burns}</g>
     ${overlay}
   </svg>`;
-  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(s);
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
 
 const RAW_ALERTS: AlertBase[] = [
@@ -774,14 +774,14 @@ const RAW_ALERTS: AlertBase[] = [
   },
 ];
 
-export const ALERTS: Alert[] = RAW_ALERTS.map((a) => {
-  const seed = Number(a.id.split("-").pop()) || 0;
+export const ALERTS: Alert[] = RAW_ALERTS.map((alert) => {
+  const seed = Number(alert.id.split("-").pop()) || 0;
   const geometry: Polygon = {
     type: "Polygon",
-    coordinates: makePoly(a.lng, a.lat, seed, a.km),
+    coordinates: makePoly(alert.lng, alert.lat, seed, alert.km),
   };
   return {
-    ...a,
+    ...alert,
     geometry,
     before: satSVG(seed, false, geometry),
     after: satSVG(seed, true, geometry),
@@ -790,17 +790,17 @@ export const ALERTS: Alert[] = RAW_ALERTS.map((a) => {
 
 export const ALERTS_GEOJSON: AlertFeatureCollection = {
   type: "FeatureCollection",
-  features: ALERTS.map((a) => ({
+  features: ALERTS.map((alert) => ({
     type: "Feature" as const,
-    id: a.id,
+    id: alert.id,
     properties: {
-      id: a.id,
-      severity: a.severity,
-      country: a.country,
-      ha: a.ha,
-      date: a.date,
+      id: alert.id,
+      severity: alert.severity,
+      country: alert.country,
+      ha: alert.ha,
+      date: alert.date,
     },
-    geometry: a.geometry,
+    geometry: alert.geometry,
   })),
 };
 
@@ -823,35 +823,39 @@ export const CROSSING_COLOR: Record<CrossingType, string> = {
 
 export const ALERT_COLOR = "#ff5c39";
 
+const LIGHT_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    base: {
+      type: "raster",
+      tiles: ["https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"],
+      tileSize: 256,
+      attribution: "© CARTO - SIMONTINI",
+    },
+  },
+  layers: [{ id: "base", type: "raster", source: "base" }],
+};
+
+const DARK_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    base: {
+      type: "raster",
+      tiles: ["https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"],
+      tileSize: 256,
+      attribution: "© CARTO - SIMONTINI",
+    },
+  },
+  layers: [{ id: "base", type: "raster", source: "base" }],
+};
+
 export const BASEMAP = {
   light: {
-    style: {
-      version: 8,
-      sources: {
-        base: {
-          type: "raster",
-          tiles: ["https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"],
-          tileSize: 256,
-          attribution: "© CARTO - SIMONTINI",
-        },
-      },
-      layers: [{ id: "base", type: "raster", source: "base" }],
-    } as StyleSpecification,
+    style: LIGHT_STYLE,
     attribution: "© CARTO · demo alerts are illustrative",
   },
   dark: {
-    style: {
-      version: 8,
-      sources: {
-        base: {
-          type: "raster",
-          tiles: ["https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"],
-          tileSize: 256,
-          attribution: "© CARTO - SIMONTINI",
-        },
-      },
-      layers: [{ id: "base", type: "raster", source: "base" }],
-    } as StyleSpecification,
+    style: DARK_STYLE,
     attribution: "© CARTO · demo alerts are illustrative",
   },
   sat: {
@@ -868,40 +872,50 @@ export const BASEMAP_FOR_THEME = (theme: "light" | "dark"): StyleSpecification =
 
 const MIN_DATE = new Date("2021-12-01");
 
-function monthIdx(d: string): number {
+/** Parse a "YYYY-MM-DD" alert date string to a local Date (avoids UTC drift). */
+function parseAlertDate(dateStr: string): Date {
+  return new Date(dateStr + "T00:00:00");
+}
+
+function monthIdx(dateStr: string): number {
+  const date = parseAlertDate(dateStr);
   return (
-    (new Date(d + "T00:00:00").getFullYear() - MIN_DATE.getFullYear()) * 12 +
-    (new Date(d + "T00:00:00").getMonth() - MIN_DATE.getMonth())
+    (date.getFullYear() - MIN_DATE.getFullYear()) * 12 +
+    (date.getMonth() - MIN_DATE.getMonth())
   );
 }
 
-export const MAX_MONTH = Math.max(
-  ...ALERTS.map((a) => Math.max(monthIdx(a.date), monthIdx(a.publishedDate))),
-);
+export const MAX_MONTH = ALERTS.length
+  ? Math.max(
+      ...ALERTS.map((alert) =>
+        Math.max(monthIdx(alert.date), monthIdx(alert.publishedDate)),
+      ),
+    )
+  : 0;
 
 export const HA_MIN = 0;
 export const HA_MAX = 1300;
 
-export function monthFromIdx(i: number): string {
-  const d = new Date(MIN_DATE);
-  d.setMonth(d.getMonth() + i);
-  return `${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+export function monthFromIdx(monthIndex: number): string {
+  const date = new Date(MIN_DATE);
+  date.setMonth(date.getMonth() + monthIndex);
+  return `${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
 }
 
 export function getAlert(id: string | null | undefined): Alert | undefined {
   if (!id) return undefined;
-  return ALERTS.find((a) => a.id === id);
+  return ALERTS.find((alert) => alert.id === id);
 }
 
-function haversineKm(a: Alert, b: Alert): number {
-  const R = 6371;
+function haversineKm(first: Alert, second: Alert): number {
+  const earthRadiusKm = 6371;
   const rad = Math.PI / 180;
-  const dLat = (b.lat - a.lat) * rad;
-  const dLng = (b.lng - a.lng) * rad;
-  const s =
+  const dLat = (second.lat - first.lat) * rad;
+  const dLng = (second.lng - first.lng) * rad;
+  const haversineCore =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(s));
+    Math.cos(first.lat * rad) * Math.cos(second.lat * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * earthRadiusKm * Math.asin(Math.sqrt(haversineCore));
 }
 
 export interface RelatedAlert {
@@ -912,35 +926,41 @@ export interface RelatedAlert {
 
 /** Other alerts ranked by shared administrative level (district > province >
     country), ties broken by distance. */
-export function relatedAlerts(a: Alert, max = 3): RelatedAlert[] {
-  return ALERTS.filter((o) => o.id !== a.id)
-    .map((o) => {
-      const km = haversineKm(a, o);
+export function relatedAlerts(alert: Alert, max = 3): RelatedAlert[] {
+  return ALERTS.filter((other) => other.id !== alert.id)
+    .map((other) => {
+      const km = haversineKm(alert, other);
       const rank =
-        o.district && o.district === a.district && o.province === a.province
+        other.district && other.district === alert.district && other.province === alert.province
           ? 0
-          : o.province && o.province === a.province
+          : other.province && other.province === alert.province
             ? 1
-            : o.country === a.country
+            : other.country === alert.country
               ? 2
               : 3;
-      const relation =
-        rank === 0
-          ? `Same district · ${o.district}`
-          : rank === 1
-            ? `Same province · ${o.province}`
-            : rank === 2
-              ? `Same country · ${o.country}`
-              : `${Math.round(km)} km away`;
-      return { alert: o, relation, km, rank };
+      let relation: string;
+      switch (rank) {
+        case 0:
+          relation = `Same district · ${other.district}`;
+          break;
+        case 1:
+          relation = `Same province · ${other.province}`;
+          break;
+        case 2:
+          relation = `Same country · ${other.country}`;
+          break;
+        default:
+          relation = `${Math.round(km)} km away`;
+      }
+      return { alert: other, relation, km, rank };
     })
-    .sort((x, y) => x.rank - y.rank || x.km - y.km)
+    .sort((first, second) => first.rank - second.rank || first.km - second.km)
     .slice(0, max)
     .map(({ alert, relation, km }) => ({ alert, relation, km }));
 }
 
-export function fmtDate(d: string): string {
-  return new Date(d + "T00:00:00").toLocaleDateString("en-GB", {
+export function fmtDate(dateStr: string): string {
+  return parseAlertDate(dateStr).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -948,38 +968,44 @@ export function fmtDate(d: string): string {
 }
 
 /** Narrow a GeoJSON coordinate pair (`number[]`) to a maplibre `[lng, lat]` tuple. */
-export function toLngLat(c: number[]): [number, number] {
-  if (c.length < 2) throw new Error("Expected a [lng, lat] coordinate pair");
-  return [c[0], c[1]];
+export function toLngLat(coord: number[]): [number, number] {
+  if (coord.length < 2) throw new Error("Expected a [lng, lat] coordinate pair");
+  return [coord[0], coord[1]];
 }
 
-export const COUNTRIES = [...new Set(ALERTS.map((a) => a.country))].sort();
-export const DRIVERS = [...new Set(ALERTS.map((a) => a.driver))].sort();
-export const SOURCES = [...new Set(ALERTS.map((a) => a.originalSource))].sort();
+/** Bounding box enclosing a ring of `[lng, lat]` coordinates. Returns an empty
+ *  bounds for an empty ring so callers don't crash on degenerate geometry. */
+export function boundsOfRing(ring: number[][]): LngLatBounds {
+  if (ring.length === 0) return new LngLatBounds();
+  const first = toLngLat(ring[0]);
+  return ring.reduce(
+    (bounds, coord) => bounds.extend(toLngLat(coord)),
+    new LngLatBounds(first, first),
+  );
+}
 
-export function visibleAlerts(filters: {
-  dateMode: "detected" | "published";
-  monthFrom: number;
-  monthTo: number;
-  haFrom: number;
-  haTo: number;
-  country: string;
-  driver: string;
-  source: string;
-  code: string;
-}): Alert[] {
-  const q = filters.code.trim().toLowerCase();
-  return ALERTS.filter((a) => {
-    if (filters.country && a.country !== filters.country) return false;
-    if (filters.driver && a.driver !== filters.driver) return false;
-    if (filters.source && a.originalSource !== filters.source) return false;
-    if (q && !a.id.toLowerCase().includes(q)) return false;
-    if (a.ha < filters.haFrom || a.ha > filters.haTo) return false;
-    const d = filters.dateMode === "published" ? a.publishedDate : a.date;
-    const idx = monthIdx(d);
+/** Distinct values of a selector across ALERTS, sorted ascending. */
+function distinctSorted(selector: (alert: Alert) => string): string[] {
+  return [...new Set(ALERTS.map(selector))].sort();
+}
+
+export const COUNTRIES = distinctSorted((alert) => alert.country);
+export const DRIVERS = distinctSorted((alert) => alert.driver);
+export const SOURCES = distinctSorted((alert) => alert.originalSource);
+
+export function visibleAlerts(filters: Filters): Alert[] {
+  const searchText = filters.code.trim().toLowerCase();
+  return ALERTS.filter((alert) => {
+    if (filters.country && alert.country !== filters.country) return false;
+    if (filters.driver && alert.driver !== filters.driver) return false;
+    if (filters.source && alert.originalSource !== filters.source) return false;
+    if (searchText && !alert.id.toLowerCase().includes(searchText)) return false;
+    if (alert.ha < filters.haFrom || alert.ha > filters.haTo) return false;
+    const dateStr = filters.dateMode === "published" ? alert.publishedDate : alert.date;
+    const idx = monthIdx(dateStr);
     if (idx < filters.monthFrom || idx > filters.monthTo) return false;
     return true;
-  }).sort((x, y) => y.date.localeCompare(x.date));
+  }).sort((first, second) => second.date.localeCompare(first.date));
 }
 
 export function defaultFilters(): Filters {

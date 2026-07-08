@@ -10,4 +10,4 @@ const isMac =
   navigator.platform.toUpperCase().includes("MAC");
 
 export const cmdKey = isMac ? "⌘" : "Ctrl";
-export const cmdKeyKey = isMac ? "K" : "K";
+export const cmdKeyKey = "K";

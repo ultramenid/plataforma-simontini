@@ -43,6 +43,45 @@ function Field({ children }: { children: ReactNode }) {
   return <div className="mb-3">{children}</div>;
 }
 
+/** Shared label + select for single-value filter fields (country/driver/source).
+ *  Extracted because the three original blocks were structurally identical. */
+function FilterSelect({
+  id,
+  label,
+  placeholder,
+  allLabel,
+  options,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  placeholder: string;
+  allLabel: string;
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Field>
+      <Label htmlFor={id}>{label}</Label>
+      <Select value={value || "all"} onValueChange={onChange}>
+        <SelectTrigger id={id}>
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">{allLabel}</SelectItem>
+          {options.map((option) => (
+            <SelectItem key={option} value={option}>
+              {option}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Field>
+  );
+}
+
 export function FilterPanel({
   draft,
   onDraftChange,
@@ -57,9 +96,9 @@ export function FilterPanel({
       <Field>
         <RadioGroup
           value={draft.dateMode}
-          onValueChange={(v) =>
+          onValueChange={(value) =>
             onDraftChange({
-              dateMode: v === "detected" || v === "published" ? v : draft.dateMode,
+              dateMode: value === "detected" || value === "published" ? value : draft.dateMode,
             })
           }
           className="mt-0.5 flex gap-3"
@@ -91,8 +130,8 @@ export function FilterPanel({
           max={MAX_MONTH}
           valueFrom={draft.monthFrom}
           valueTo={draft.monthTo}
-          onFromChange={(v) => onDraftChange({ monthFrom: v })}
-          onToChange={(v) => onDraftChange({ monthTo: v })}
+          onFromChange={(value) => onDraftChange({ monthFrom: value })}
+          onToChange={(value) => onDraftChange({ monthTo: value })}
           fromLabel={allDates ? "All dates" : monthFromIdx(draft.monthFrom)}
           toLabel={allDates ? "All dates" : monthFromIdx(draft.monthTo)}
           ariaFromLabel="From month"
@@ -109,8 +148,8 @@ export function FilterPanel({
           step={10}
           valueFrom={draft.haFrom}
           valueTo={draft.haTo}
-          onFromChange={(v) => onDraftChange({ haFrom: v })}
-          onToChange={(v) => onDraftChange({ haTo: v })}
+          onFromChange={(value) => onDraftChange({ haFrom: value })}
+          onToChange={(value) => onDraftChange({ haTo: value })}
           fromLabel={`${draft.haFrom} ha`}
           toLabel={`${draft.haTo} ha`}
           ariaFromLabel="From hectares"
@@ -119,65 +158,33 @@ export function FilterPanel({
       </Field>
 
       <Heading>Attributes</Heading>
-      <Field>
-        <Label htmlFor="f-country">Country</Label>
-        <Select
-          value={draft.country || "all"}
-          onValueChange={(v) =>
-            onDraftChange({ country: v === "all" ? "" : v })
-          }
-        >
-          <SelectTrigger id="f-country">
-            <SelectValue placeholder="All countries" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All countries</SelectItem>
-            {COUNTRIES.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Field>
-      <Field>
-        <Label htmlFor="f-driver">Deforestation driver</Label>
-        <Select
-          value={draft.driver || "all"}
-          onValueChange={(v) => onDraftChange({ driver: v === "all" ? "" : v })}
-        >
-          <SelectTrigger id="f-driver">
-            <SelectValue placeholder="All drivers" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All drivers</SelectItem>
-            {DRIVERS.map((d) => (
-              <SelectItem key={d} value={d}>
-                {d}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Field>
-      <Field>
-        <Label htmlFor="f-source">Original source</Label>
-        <Select
-          value={draft.source || "all"}
-          onValueChange={(v) => onDraftChange({ source: v === "all" ? "" : v })}
-        >
-          <SelectTrigger id="f-source">
-            <SelectValue placeholder="All sources" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All sources</SelectItem>
-            {SOURCES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {s}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Field>
+      <FilterSelect
+        id="f-country"
+        label="Country"
+        placeholder="All countries"
+        allLabel="All countries"
+        options={COUNTRIES}
+        value={draft.country}
+        onChange={(value) => onDraftChange({ country: value === "all" ? "" : value })}
+      />
+      <FilterSelect
+        id="f-driver"
+        label="Deforestation driver"
+        placeholder="All drivers"
+        allLabel="All drivers"
+        options={DRIVERS}
+        value={draft.driver}
+        onChange={(value) => onDraftChange({ driver: value === "all" ? "" : value })}
+      />
+      <FilterSelect
+        id="f-source"
+        label="Original source"
+        placeholder="All sources"
+        allLabel="All sources"
+        options={SOURCES}
+        value={draft.source}
+        onChange={(value) => onDraftChange({ source: value === "all" ? "" : value })}
+      />
 
       <div className="mt-5 flex gap-2">
         <Button className="flex-1 text-[11px]" onClick={onApply}>

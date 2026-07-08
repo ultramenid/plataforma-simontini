@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { AlertCard } from "@/components/AlertCard";
 import { CommandPalette } from "@/components/CommandPalette";
 import { EmbedDialog } from "@/components/EmbedDialog";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { FilterPanel } from "@/components/FilterPanel";
 import { MapSearch } from "@/components/MapSearch";
 import { MapView } from "@/components/MapView";
@@ -18,11 +19,11 @@ import {
   visibleAlerts,
 } from "@/lib/data";
 import type { BasemapKey, Filters } from "@/lib/types";
+import { buildAlertUrl } from "@/lib/alert-url";
 import { cn } from "@/lib/utils";
 
 function shareAlert(id: string) {
-  const url = `${window.location.origin}${window.location.pathname}?alert=${id}`;
-  navigator.clipboard?.writeText(url).catch(() => {});
+  navigator.clipboard?.writeText(buildAlertUrl(id)).catch(() => {});
 }
 
 export function MapPage() {
@@ -56,10 +57,10 @@ export function MapPage() {
   // ⌘K / Ctrl+K toggles the command palette (disabled in embed mode)
   useEffect(() => {
     if (embed) return;
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setCmdkOpen((o) => !o);
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCmdkOpen((open) => !open);
       }
     };
     document.addEventListener("keydown", onKey);
@@ -68,26 +69,32 @@ export function MapPage() {
 
   // Esc: close the alert card; if already closed, reset everything.
   // Disabled in embed mode — the embed stays locked on its alert.
-  const activeIdRef = useRef(activeId);
-  activeIdRef.current = activeId;
   useEffect(() => {
     if (embed) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
       // let open overlays handle their own Esc
       if (cmdkOpen || embedOpen || mobileFiltersOpen) return;
-      if (activeIdRef.current) {
+      if (activeId) {
         // 1st Esc: close the alert detail
         setActiveId(null);
         return;
       }
       // 2nd Esc: reset view, filters, and search via a single trigger;
       // the actual filter reset happens in the resetToken effect below.
-      setResetToken((t) => t + 1);
+      setResetToken((token) => token + 1);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [cmdkOpen, embedOpen, mobileFiltersOpen, embed]);
+  }, [activeId, cmdkOpen, embedOpen, mobileFiltersOpen, embed]);
+
+  // Reset both draft and applied filters to defaults. Shared by the resetToken
+  // effect (double-Esc) and the Reset button so the logic lives in one place.
+  const resetFilters = () => {
+    const defaults = defaultFilters();
+    setDraft(defaults);
+    setApplied(defaults);
+  };
 
   // Bumping resetToken resets both the map view (in MapView) and the
   // filter state. Kept here so the Esc handler only calls one setState.
@@ -97,9 +104,7 @@ export function MapPage() {
       didReset.current = true;
       return;
     }
-    const d = defaultFilters();
-    setDraft(d);
-    setApplied(d);
+    resetFilters();
   }, [resetToken]);
 
   // keep ?alert in the URL in sync with the selection (skip the first pass)
@@ -119,31 +124,39 @@ export function MapPage() {
     );
   }, [activeId, setParams]);
 
+  // Reconcile activeId with browser navigation (Back/Forward) so the deep-link
+  // `?alert=ID` contract stays in sync when the URL changes externally. One-way
+  // state→URL sync above handles user-driven selection; this closes the loop.
+  // `activeId` is intentionally read via the setter closure to avoid a feedback
+  // loop with the state→URL effect above.
+  useEffect(() => {
+    const urlAlert = params.get("alert");
+    const resolved = urlAlert && getAlert(urlAlert) ? urlAlert : null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setActiveId((current) => (current === resolved ? current : resolved));
+  }, [params]);
+
   const visible = useMemo(() => visibleAlerts(applied), [applied]);
-  const visIds = useMemo(() => new Set(visible.map((a) => a.id)), [visible]);
+  const visIds = useMemo(() => new Set(visible.map((alert) => alert.id)), [visible]);
   const features = useMemo(
-    () => ALERTS_GEOJSON.features.filter((f) => visIds.has(f.id)),
+    () => ALERTS_GEOJSON.features.filter((feature) => visIds.has(feature.id)),
     [visIds],
   );
 
   const count = visible.length;
-  const ha = visible.reduce((s, a) => s + a.ha, 0);
-  const countries = new Set(visible.map((a) => a.country)).size;
+  const totalHa = visible.reduce((sum, alert) => sum + alert.ha, 0);
+  const countries = new Set(visible.map((alert) => alert.country)).size;
   const label = `${count} active alert${count === 1 ? "" : "s"}`;
   const activeAlert = getAlert(activeId);
 
   const onDraftChange = (patch: Partial<Filters>) =>
-    setDraft((d) => ({ ...d, ...patch }));
+    setDraft((draft) => ({ ...draft, ...patch }));
   const handleApply = () => setApplied(draft);
-  const handleReset = () => {
-    const d = defaultFilters();
-    setDraft(d);
-    setApplied(d);
-  };
+  const handleReset = resetFilters;
   // code search is live across both draft and applied
-  const setCode = (v: string) => {
-    setDraft((d) => ({ ...d, code: v }));
-    setApplied((a) => ({ ...a, code: v }));
+  const setCode = (code: string) => {
+    setDraft((draft) => ({ ...draft, code }));
+    setApplied((applied) => ({ ...applied, code }));
   };
 
   const onSelectAlert = (id: string) => setActiveId(id);
@@ -153,7 +166,7 @@ export function MapPage() {
   };
 
   const handleEmbed = (id: string) => {
-    const url = `${window.location.origin}${window.location.pathname}?alert=${id}&embed=1`;
+    const url = buildAlertUrl(id, true);
     setEmbedCode(
       `<iframe src="${url}" width="1200" height="630" style="max-width:100%;border:1px solid #263029;border-radius:8px" loading="lazy" title="Simontini deforestation alert ${id}"></iframe>`,
     );
@@ -172,32 +185,36 @@ export function MapPage() {
             : "grid-cols-[300px_1fr] max-md:grid-cols-1 max-md:grid-rows-[50px_1fr]",
         )}
       >
-        <Sidebar
-          count={count}
-          ha={ha}
-          countries={countries}
-          label={label}
-          onOpenMobileFilters={() => setMobileFiltersOpen(true)}
-          embed={embed}
-        >
-          <FilterPanel
-            draft={draft}
-            onDraftChange={onDraftChange}
-            onApply={handleApply}
-            onReset={handleReset}
-          />
-        </Sidebar>
+        <ErrorBoundary label="Sidebar">
+          <Sidebar
+            count={count}
+            ha={totalHa}
+            countries={countries}
+            label={label}
+            onOpenMobileFilters={() => setMobileFiltersOpen(true)}
+            embed={embed}
+          >
+            <FilterPanel
+              draft={draft}
+              onDraftChange={onDraftChange}
+              onApply={handleApply}
+              onReset={handleReset}
+            />
+          </Sidebar>
+        </ErrorBoundary>
 
         <div className="relative h-full w-full min-w-0">
-          <MapView
-            features={features}
-            activeId={activeId}
-            basemap={basemap}
-            theme={resolved}
-            resetToken={resetToken}
-            embed={embed}
-            onSelect={onSelectAlert}
-          />
+          <ErrorBoundary label="Map">
+            <MapView
+              features={features}
+              activeId={activeId}
+              basemap={basemap}
+              theme={resolved}
+              resetToken={resetToken}
+              embed={embed}
+              onSelect={onSelectAlert}
+            />
+          </ErrorBoundary>
           {!embed && (
             <>
               <MapSearch onOpenCommand={() => setCmdkOpen(true)} />
@@ -207,7 +224,7 @@ export function MapPage() {
                 onClose={() => setActiveId(null)}
                 onEmbed={handleEmbed}
               />
-              <EscHint active={!!activeId} resetToken={resetToken} />
+              <EscHint />
             </>
           )}
         </div>
@@ -265,17 +282,7 @@ export function MapPage() {
 }
 
 /** Floating bottom-center hint describing the Esc grammar. */
-function EscHint({
-  active,
-  resetToken,
-}: {
-  active: boolean;
-  resetToken: number;
-}) {
-  // re-render on resetToken so the labels stay in sync after a reset
-  void resetToken;
-  void active;
-
+function EscHint() {
   return (
     <div
       aria-hidden

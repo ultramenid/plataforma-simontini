@@ -6,8 +6,8 @@ interface DualRangeProps {
   step?: number;
   valueFrom: number;
   valueTo: number;
-  onFromChange: (v: number) => void;
-  onToChange: (v: number) => void;
+  onFromChange: (value: number) => void;
+  onToChange: (value: number) => void;
   fromLabel: string;
   toLabel: string;
   ariaFromLabel: string;
@@ -36,6 +36,12 @@ export function DualRange({
     const wrap = wrapRef.current;
     if (!wrap) return;
     const update = () => {
+      // Guard against max === 0 (or NaN inputs) so the fill style never
+      // collapses to Infinity/NaN — render an empty fill instead.
+      if (!isFinite(max) || max <= 0) {
+        setFill({ left: 0, width: 0 });
+        return;
+      }
       const pctFrom = (valueFrom / max) * 100;
       const pctTo = (valueTo / max) * 100;
       const thumbOffset = 12; // compensate for thumb width so fill appears to touch thumb centres
@@ -46,20 +52,20 @@ export function DualRange({
       setFill({ left, width });
     };
     update();
-    const ro = new ResizeObserver(update);
-    ro.observe(wrap);
-    return () => ro.disconnect();
+    const resizeObserver = new ResizeObserver(update);
+    resizeObserver.observe(wrap);
+    return () => resizeObserver.disconnect();
   }, [valueFrom, valueTo, max]);
 
-  const handleFrom = (e: ChangeEvent<HTMLInputElement>) => {
-    const v = Number(e.target.value);
-    if (v > valueTo) onToChange(v);
-    onFromChange(v);
+  const handleFrom = (event: ChangeEvent<HTMLInputElement>) => {
+    const value = Number(event.target.value);
+    if (value > valueTo) onToChange(value);
+    onFromChange(value);
   };
-  const handleTo = (e: ChangeEvent<HTMLInputElement>) => {
-    const v = Number(e.target.value);
-    if (v < valueFrom) onFromChange(v);
-    onToChange(v);
+  const handleTo = (event: ChangeEvent<HTMLInputElement>) => {
+    const value = Number(event.target.value);
+    if (value < valueFrom) onFromChange(value);
+    onToChange(value);
   };
 
   return (

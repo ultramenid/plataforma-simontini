@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 
 import {
-  Command,
   CommandDialog,
   CommandEmpty,
   CommandGroup,
@@ -26,7 +25,7 @@ interface CommandPaletteProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   activeId: string | null;
-  onSetBasemap: (b: BasemapKey) => void;
+  onSetBasemap: (basemap: BasemapKey) => void;
   onPickAlert: (id: string) => void;
   onShare: (id: string) => void;
   onEmbed: (id: string) => void;
@@ -45,8 +44,8 @@ export function CommandPalette({
 
   const close = () => onOpenChange(false);
 
-  const run = (fn: () => void) => {
-    fn();
+  const run = (action: () => void) => {
+    action();
     close();
   };
 
@@ -71,11 +70,11 @@ export function CommandPalette({
 interface CommandPaletteBodyProps {
   activeId: string | null;
   navigate: ReturnType<typeof useNavigate>;
-  onSetBasemap: (b: BasemapKey) => void;
+  onSetBasemap: (basemap: BasemapKey) => void;
   onPickAlert: (id: string) => void;
   onShare: (id: string) => void;
   onEmbed: (id: string) => void;
-  run: (fn: () => void) => void;
+  run: (action: () => void) => void;
 }
 
 function CommandPaletteBody({
@@ -90,8 +89,8 @@ function CommandPaletteBody({
   const [mode, setMode] = useState<"commands" | "code">("commands");
   const [query, setQuery] = useState("");
 
-  const codeResults = ALERTS.filter((a) =>
-    a.id.toLowerCase().includes(query.trim().toLowerCase()),
+  const codeResults = ALERTS.filter((alert) =>
+    alert.id.toLowerCase().includes(query.trim().toLowerCase()),
   ).slice(0, 10);
 
   return (
@@ -107,102 +106,25 @@ function CommandPaletteBody({
       />
       <CommandList>
         {mode === "code" ? (
-          codeResults.length === 0 ? (
-            <CommandEmpty>
-              {query.trim()
-                ? `No alerts found for “${query.trim()}”`
-                : "Type an alert code…"}
-            </CommandEmpty>
-          ) : (
-            <CommandGroup heading="Alerts">
-              {codeResults.map((a) => (
-                <CommandItem
-                  key={a.id}
-                  value={`alert-${a.id}`}
-                  onSelect={() => run(() => onPickAlert(a.id))}
-                >
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-canopy">
-                    <Search className="size-4" />
-                  </span>
-                  <span className="flex-1 leading-tight">
-                    {a.id}
-                    <span className="block text-[10px] text-muted-foreground">
-                      {a.ha.toLocaleString()} ha · {a.region}, {a.country}
-                    </span>
-                  </span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          )
+          <CodeResults
+            results={codeResults}
+            query={query}
+            onPickAlert={onPickAlert}
+            run={run}
+          />
         ) : (
-          <CommandGroup heading="Actions">
-            <CommandItem
-              value="search-code"
-              onSelect={() => {
-                setMode("code");
-                setQuery("");
-              }}
-            >
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-canopy">
-                <Search className="size-4" />
-              </span>
-              <span className="flex-1">Search alert code…</span>
-              <span className="text-[10px] text-muted-foreground">
-                Type code and press Enter
-              </span>
-            </CommandItem>
-            <CommandItem
-              value="basemap-map"
-              onSelect={() => run(() => onSetBasemap("map"))}
-            >
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-canopy">
-                <MapIcon className="size-4" />
-              </span>
-              <span className="flex-1">Switch to Map basemap</span>
-            </CommandItem>
-            <CommandItem
-              value="basemap-sat"
-              onSelect={() => run(() => onSetBasemap("sat"))}
-            >
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-canopy">
-                <Satellite className="size-4" />
-              </span>
-              <span className="flex-1">Switch to Satellite basemap</span>
-            </CommandItem>
-            {activeId && (
-              <>
-                <CommandItem
-                  value="open-report"
-                  onSelect={() =>
-                    run(() => navigate(`/alert/${activeId}`))
-                  }
-                >
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-canopy">
-                    <FileText className="size-4" />
-                  </span>
-                  <span className="flex-1">Open report {activeId}</span>
-                </CommandItem>
-                <CommandItem
-                  value="share-alert"
-                  onSelect={() => run(() => onShare(activeId))}
-                >
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-canopy">
-                    <Share2 className="size-4" />
-                  </span>
-                  <span className="flex-1">Share selected alert</span>
-                </CommandItem>
-                <CommandItem
-                  value="embed-alert"
-                  onSelect={() => run(() => onEmbed(activeId))}
-                >
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-canopy">
-                    <Code className="size-4" />
-                  </span>
-                  <span className="flex-1">Embed selected alert</span>
-                </CommandItem>
-              </>
-            )}
-          </CommandGroup>
+          <ActionList
+            activeId={activeId}
+            navigate={navigate}
+            onEnterCodeMode={() => {
+              setMode("code");
+              setQuery("");
+            }}
+            onSetBasemap={onSetBasemap}
+            onShare={onShare}
+            onEmbed={onEmbed}
+            run={run}
+          />
         )}
       </CommandList>
       <div className="flex items-center justify-between border-t border-line px-3 py-2 text-[10px] text-muted-foreground">
@@ -217,6 +139,130 @@ function CommandPaletteBody({
         </span>
       </div>
     </>
+  );
+}
+
+interface CodeResultsProps {
+  results: (typeof ALERTS)[number][];
+  query: string;
+  onPickAlert: (id: string) => void;
+  run: (action: () => void) => void;
+}
+
+function CodeResults({ results, query, onPickAlert, run }: CodeResultsProps) {
+  if (results.length === 0) {
+    return (
+      <CommandEmpty>
+        {query.trim()
+          ? `No alerts found for “${query.trim()}”`
+          : "Type an alert code…"}
+      </CommandEmpty>
+    );
+  }
+
+  return (
+    <CommandGroup heading="Alerts">
+      {results.map((alert) => (
+        <CommandItem
+          key={alert.id}
+          value={`alert-${alert.id}`}
+          onSelect={() => run(() => onPickAlert(alert.id))}
+        >
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-canopy">
+            <Search className="size-4" />
+          </span>
+          <span className="flex-1 leading-tight">
+            {alert.id}
+            <span className="block text-[10px] text-muted-foreground">
+              {alert.ha.toLocaleString()} ha · {alert.region}, {alert.country}
+            </span>
+          </span>
+        </CommandItem>
+      ))}
+    </CommandGroup>
+  );
+}
+
+interface ActionListProps {
+  activeId: string | null;
+  navigate: ReturnType<typeof useNavigate>;
+  onEnterCodeMode: () => void;
+  onSetBasemap: (basemap: BasemapKey) => void;
+  onShare: (id: string) => void;
+  onEmbed: (id: string) => void;
+  run: (action: () => void) => void;
+}
+
+function ActionList({
+  activeId,
+  navigate,
+  onEnterCodeMode,
+  onSetBasemap,
+  onShare,
+  onEmbed,
+  run,
+}: ActionListProps) {
+  return (
+    <CommandGroup heading="Actions">
+      <CommandItem value="search-code" onSelect={onEnterCodeMode}>
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-canopy">
+          <Search className="size-4" />
+        </span>
+        <span className="flex-1">Search alert code…</span>
+        <span className="text-[10px] text-muted-foreground">
+          Type code and press Enter
+        </span>
+      </CommandItem>
+      <CommandItem
+        value="basemap-map"
+        onSelect={() => run(() => onSetBasemap("map"))}
+      >
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-canopy">
+          <MapIcon className="size-4" />
+        </span>
+        <span className="flex-1">Switch to Map basemap</span>
+      </CommandItem>
+      <CommandItem
+        value="basemap-sat"
+        onSelect={() => run(() => onSetBasemap("sat"))}
+      >
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-canopy">
+          <Satellite className="size-4" />
+        </span>
+        <span className="flex-1">Switch to Satellite basemap</span>
+      </CommandItem>
+      {activeId && (
+        <>
+          <CommandItem
+            value="open-report"
+            onSelect={() => run(() => navigate(`/alert/${activeId}`))}
+          >
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-canopy">
+              <FileText className="size-4" />
+            </span>
+            <span className="flex-1">Open report {activeId}</span>
+          </CommandItem>
+          <CommandItem
+            value="share-alert"
+            onSelect={() => run(() => onShare(activeId))}
+          >
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-canopy">
+              <Share2 className="size-4" />
+            </span>
+            <span className="flex-1">Share selected alert</span>
+          </CommandItem>
+          <CommandItem
+            value="embed-alert"
+            onSelect={() => run(() => onEmbed(activeId))}
+          >
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-canopy">
+              <Code className="size-4" />
+            </span>
+            <span className="flex-1">Embed selected alert</span>
+          </CommandItem>
+        </>
+      )}
+    </CommandGroup>
   );
 }
 

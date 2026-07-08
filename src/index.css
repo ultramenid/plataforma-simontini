@@ -484,6 +484,254 @@ html.theme-transitioning * {
     margin-bottom: 12px;
 }
 
+/* report case-file banner: mono kicker + weighty h1.
+   The summary line is primary information (foreground), not muted —
+   it is the single factual sentence a reader takes away. */
+.case-banner h1 {
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+.case-banner .summary {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--foreground);
+}
+
+/* report field report ("dispatch"): canopy rail, dateline, lede + body */
+.dispatch {
+    position: relative;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: 18px 0 18px 22px;
+    margin: 4px 0 28px;
+}
+.dispatch::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--canopy);
+    border-radius: 2px;
+}
+.dispatch .dateline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--canopy);
+    margin-bottom: 10px;
+}
+.dispatch .dateline .dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--alert);
+    flex: none;
+}
+.dispatch h3 {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.14;
+    letter-spacing: -0.012em;
+    margin-bottom: 12px;
+    text-wrap: balance;
+}
+.dispatch .lede {
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--foreground);
+    margin-bottom: 12px;
+    max-width: 68ch;
+    text-wrap: pretty;
+}
+.dispatch .lede::first-letter {
+    font-weight: 700;
+}
+.dispatch .body p {
+    font-size: 13px;
+    line-height: 1.62;
+    color: var(--muted-foreground);
+    margin-bottom: 10px;
+    max-width: 68ch;
+    text-wrap: pretty;
+}
+.dispatch .body p:last-child {
+    margin-bottom: 0;
+}
+
+/* report press clippings: hairline-separated rows, no nested cards */
+.clippings {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--line);
+}
+.clippings > li {
+    border-bottom: 1px solid var(--line);
+    padding: 13px 0;
+}
+.clippings .masthead {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+}
+.clippings .masthead .outlet {
+    font-weight: 600;
+    color: var(--canopy);
+    letter-spacing: 0.04em;
+}
+.clippings .masthead .sep {
+    color: var(--line);
+}
+.clippings .masthead .date {
+    color: var(--muted-foreground);
+}
+.clippings .headline {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--foreground);
+}
+.clippings .headline:hover {
+    color: var(--canopy);
+}
+.clippings .excerpt {
+    margin-top: 5px;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--muted-foreground);
+    max-width: 68ch;
+}
+
+.case-banner .rule {
+    height: 1px;
+    background: var(--canopy);
+    opacity: 0.35;
+}
+
+/* report case-file facts: three labelled sub-blocks with a left hairline */
+.fact-block {
+    padding-left: 12px;
+    border-left: 1px solid var(--line);
+}
+.fact-block:first-child {
+    border-left: 0;
+    padding-left: 0;
+}
+.fact-kicker {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--canopy);
+    margin-bottom: 9px;
+}
+.fact-cell {
+    margin-bottom: 7px;
+}
+.fact-cell:last-child {
+    margin-bottom: 0;
+}
+.fact-cell .k {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    margin-bottom: 2px;
+}
+.fact-cell .v {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--foreground);
+}
+
+/* report signature: territorial overlap stack.
+   Horizontal bands, one per overlap; band height scales with overlap hectares
+   so the clearing reads as a vertical "core sample" of the land it sits on.
+   Color comes from CROSSING_COLOR via an inline --band-color custom property. */
+.overlap-stack {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--secondary);
+}
+.overlap-band {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 14px;
+    min-height: 38px;
+    position: relative;
+    border-top: 1px solid var(--line);
+    background:
+        linear-gradient(
+            90deg,
+            color-mix(in oklch, var(--band-color) 16%, transparent) 0%,
+            color-mix(in oklch, var(--band-color) 7%, transparent) 38%,
+            var(--secondary) 100%
+        );
+}
+.overlap-band:first-child {
+    border-top: 0;
+}
+.overlap-band .swatch {
+    flex: none;
+    width: 6px;
+    align-self: stretch;
+    margin: 8px 0;
+    border-radius: 2px;
+    background: var(--band-color);
+}
+.overlap-band .type {
+    flex: none;
+    width: 92px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--foreground);
+}
+.overlap-band .name {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--foreground);
+}
+.overlap-band .ha {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--foreground);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+.overlap-band .ha .full {
+    color: var(--canopy);
+}
+.overlap-empty {
+    padding: 18px 14px;
+    font-size: 13px;
+    color: var(--muted-foreground);
+}
+
 /* print: report only, hide interactive chrome */
 @media print {
     .dark {
@@ -521,6 +769,9 @@ html.theme-transitioning * {
     .report-hero,
     .compare,
     .minimap-wrap,
+    .overlap-stack,
+    .dispatch,
+    .clippings > li,
     section {
         page-break-inside: avoid;
     }

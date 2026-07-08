@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Map, {
   Layer,
   ScaleControl,
@@ -7,17 +7,17 @@ import Map, {
   type MapRef,
 } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { LngLatBounds } from "maplibre-gl";
 
 import {
   ALERT_COLOR,
   BASEMAP,
   BASEMAP_FOR_THEME,
+  boundsOfRing,
   getAlert,
-  toLngLat,
 } from "@/lib/data";
 import type { AlertFeature, BasemapKey } from "@/lib/types";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
+import { usePulseLayer } from "@/lib/use-pulse-layer";
 
 interface MapViewProps {
   features: AlertFeature[];
@@ -31,6 +31,10 @@ interface MapViewProps {
 
 const INITIAL_VIEW = { longitude: 120, latitude: 5, zoom: 3.5 };
 
+// Map motion timings (see DESIGN.md > Motion).
+const FIT_BOUNDS_MS = 1400;
+const RESET_FLY_MS = 1200;
+
 export function MapView({
   features,
   activeId,
@@ -41,7 +45,6 @@ export function MapView({
   onSelect,
 }: MapViewProps) {
   const mapRef = useRef<MapRef>(null);
-  const rafRef = useRef(0);
   const onSelectRef = useRef(onSelect);
   const firstFitRef = useRef(true);
 
@@ -54,89 +57,45 @@ export function MapView({
     onSelectRef.current = onSelect;
   }, [onSelect]);
 
-  function startPulse() {
-    const map = mapRef.current?.getMap();
-    if (!map) return;
-    if (rafRef.current) return; // ponytail: a pulse loop is already running; don't double-start on HMR/StrictMode
-    const t0 = performance.now();
-    const pulse = (now: number) => {
-      // ponytail: layer can be momentarily missing during HMR; bail until it's back, then re-arm
-      if (!map.getLayer("alerts-pulse")) {
-        rafRef.current = requestAnimationFrame(pulse);
-        return;
-      }
-      const k = (Math.sin((now - t0) / 450) + 1) / 2;
-      map.setPaintProperty("alerts-pulse", "line-width", 2 + k * 7);
-      map.setPaintProperty("alerts-pulse", "line-opacity", 0.85 - k * 0.65);
-      rafRef.current = requestAnimationFrame(pulse);
-    };
-    rafRef.current = requestAnimationFrame(pulse);
-  }
+  usePulseLayer(mapRef, reduced, styleLoaded);
 
-  function stopPulse() {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    rafRef.current = 0;
-  }
+  const fitAlert = useCallback(
+    (id: string, instant: boolean) => {
+      const map = mapRef.current?.getMap();
+      if (!map) return;
+      const alert = getAlert(id);
+      if (!alert) return;
+      const ring = alert.geometry.coordinates[0];
+      if (!ring || ring.length === 0) return;
+      map.fitBounds(boundsOfRing(ring), {
+        padding: embed ? 60 : 120,
+        duration: instant ? 0 : FIT_BOUNDS_MS,
+        maxZoom: 12,
+      });
+    },
+    [embed],
+  );
 
-  function fitAlert(id: string, instant: boolean) {
-    const map = mapRef.current?.getMap();
-    if (!map) return;
-    const a = getAlert(id);
-    if (!a) return;
-    const ring = a.geometry.coordinates[0];
-    if (!ring || ring.length === 0) return;
-    const first = toLngLat(ring[0]);
-    const bounds = ring.reduce(
-      (b, c) => b.extend(toLngLat(c)),
-      new LngLatBounds(first, first),
-    );
-    map.fitBounds(bounds, {
-      padding: embed ? 60 : 120,
-      duration: instant ? 0 : 1400,
-      maxZoom: 12,
-    });
-  }
-
-  // Stop pulse on unmount.
-  useEffect(() => stopPulse, []);
-
-  // Mirror props into refs so onMapLoad sees the latest values.
+  // Mirror activeId into a ref so onMapLoad sees the latest value.
   const activeIdRef = useRef(activeId);
   useEffect(() => {
     activeIdRef.current = activeId;
   }, [activeId]);
-  const reducedRef = useRef(reduced);
-  useEffect(() => {
-    reducedRef.current = reduced;
-  }, [reduced]);
 
   function onMapLoad() {
     setStyleLoaded(true);
-    const map = mapRef.current?.getMap();
+    // First load is the only instant fit (deep-link); style reloads (theme/basemap
+    // change re-fire onLoad) animate, and so do all later activeId changes.
     if (activeIdRef.current) fitAlert(activeIdRef.current, firstFitRef.current);
     firstFitRef.current = false;
-    if (reducedRef.current || !map) return;
-    // ponytail: <Source>/<Layer> children are added after this fires; wait for the first idle paint so the layer exists before pulse touches it
-    map.once("idle", () => {
-      if (mapRef.current?.getMap() !== map) return;
-      if (reducedRef.current) return;
-      startPulse();
-    });
   }
 
-  // Restart or stop pulse when reduced-motion changes.
-  useEffect(() => {
-    if (!styleLoaded) return;
-    if (reduced) stopPulse();
-    else startPulse();
-  }, [reduced, styleLoaded]);
-
-  // Fit to the selected alert whenever it changes (after first fit).
+  // Fit to the selected alert whenever it changes. onMapLoad already handled the
+  // instant deep-link fit and cleared firstFitRef, so this path always animates.
   useEffect(() => {
     if (!activeId || !styleLoaded) return;
-    fitAlert(activeId, firstFitRef.current);
-    firstFitRef.current = false;
-  }, [activeId, styleLoaded]);
+    fitAlert(activeId, false);
+  }, [activeId, styleLoaded, fitAlert]);
 
   // Reset to the initial extent when resetToken changes (double-Esc).
   const resetTokenRef = useRef(resetToken);
@@ -149,7 +108,7 @@ export function MapView({
     map.flyTo({
       center: [INITIAL_VIEW.longitude, INITIAL_VIEW.latitude],
       zoom: INITIAL_VIEW.zoom,
-      duration: reduced ? 0 : 1200,
+      duration: reduced ? 0 : RESET_FLY_MS,
       essential: true,
     });
   }, [resetToken, styleLoaded, reduced]);
@@ -176,9 +135,9 @@ export function MapView({
         onMouseLeave: onAlertLeave,
       };
 
-  function onAlertClick(e: MapLayerMouseEvent) {
-    const f = e.features?.[0];
-    const id = f?.properties?.id;
+  function onAlertClick(event: MapLayerMouseEvent) {
+    const feature = event.features?.[0];
+    const id = feature?.properties?.id;
     if (typeof id === "string") onSelectRef.current(id);
   }
   function onAlertEnter() {
@@ -211,9 +170,9 @@ export function MapView({
         initialViewState={INITIAL_VIEW}
         minZoom={2}
         onLoad={onMapLoad}
-        onError={(e) => {
-          setMapError(e.error.message);
-          if (/webgl/i.test(e.error.message)) setWebglError(true);
+        onError={(event) => {
+          setMapError(event.error.message);
+          if (/webgl/i.test(event.error.message)) setWebglError(true);
         }}
         {...interactionProps}
         style={{ position: "absolute", inset: 0 }}

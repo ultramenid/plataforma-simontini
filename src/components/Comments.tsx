@@ -15,35 +15,76 @@ interface CommentsProps {
   alertId: string;
 }
 
+// Schema version tag persisted alongside comments so future format changes can
+// be distinguished from legacy data and migrated (CLAUDE.md data-integrity rule).
+const COMMENTS_SCHEMA_VERSION = 1;
+
+interface StoredComments {
+  v: number;
+  comments: Comment[];
+}
+
 // Accepts legacy stored comments whose replies lacked a `replies` array.
-function normalize(v: unknown): Comment[] {
-  if (!Array.isArray(v)) return [];
-  return v
-    .filter((c): c is Record<string, unknown> => !!c && typeof c === "object")
-    .map((c) => ({
-      name: String(c.name ?? ""),
-      text: String(c.text ?? ""),
-      at: Number(c.at) || 0,
-      replies: normalize(c.replies),
+// Logs a warning when legacy (unversioned) data is detected and upgraded.
+function normalize(rawComments: unknown): Comment[] {
+  if (!Array.isArray(rawComments)) return [];
+  return rawComments
+    .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === "object")
+    .map((entry) => ({
+      name: String(entry.name ?? ""),
+      text: String(entry.text ?? ""),
+      at: Number(entry.at) || 0,
+      replies: normalize(entry.replies),
     }));
 }
 
+/** Parse persisted storage, handling both the versioned schema and legacy
+ *  unversioned comment arrays. Returns normalized comments. */
+function parseStored(raw: string | null): Comment[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    // Versioned envelope: { v, comments }
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed) &&
+      typeof (parsed as Record<string, unknown>).v === "number"
+    ) {
+      const envelope = parsed as StoredComments;
+      return normalize(envelope.comments);
+    }
+    // Legacy unversioned: a bare Comment[] — upgrade in place and warn once.
+    if (Array.isArray(parsed)) {
+      if (parsed.length > 0) {
+        console.warn(
+          "[simontini-comments] migrated legacy unversioned comments to schema v1",
+        );
+      }
+      return normalize(parsed);
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
 function addReply(list: Comment[], path: number[], reply: Comment): Comment[] {
-  return list.map((c, i) =>
+  return list.map((comment, i) =>
     i === path[0]
       ? {
-          ...c,
+          ...comment,
           replies:
             path.length === 1
-              ? [...c.replies, reply]
-              : addReply(c.replies, path.slice(1), reply),
+              ? [...comment.replies, reply]
+              : addReply(comment.replies, path.slice(1), reply),
         }
-      : c,
+      : comment,
   );
 }
 
 function countAll(list: Comment[]): number {
-  return list.reduce((n, c) => n + 1 + countAll(c.replies), 0);
+  return list.reduce((total, comment) => total + 1 + countAll(comment.replies), 0);
 }
 
 function CommentForm({
@@ -60,8 +101,8 @@ function CommentForm({
   const [name, setName] = useState("");
   const [text, setText] = useState("");
 
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
     if (!name.trim() || !text.trim()) return;
     onPost(name.trim(), text.trim());
     setName("");
@@ -73,14 +114,14 @@ function CommentForm({
       <Input
         placeholder="Your name"
         value={name}
-        onChange={(e) => setName(e.target.value)}
+        onChange={(event) => setName(event.target.value)}
         required
         maxLength={60}
       />
       <Textarea
         placeholder={placeholder}
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(event) => setText(event.target.value)}
         required
         maxLength={2000}
         className={compact ? "min-h-[50px]" : "min-h-[60px]"}
@@ -108,11 +149,11 @@ function CommentNode({
   path: number[];
   depth: number;
   openPath: string | null;
-  setOpenPath: (p: string | null) => void;
+  setOpenPath: (pathKey: string | null) => void;
   onReply: (path: number[], name: string, text: string) => void;
 }) {
-  const key = path.join(".");
-  const open = openPath === key;
+  const pathKey = path.join(".");
+  const open = openPath === pathKey;
   const replyCount = countAll(comment.replies);
   // ponytail: long threads (>3 nested replies) start collapsed
   const [collapsed, setCollapsed] = useState(replyCount > 3);
@@ -136,7 +177,7 @@ function CommentNode({
       <div className="flex gap-3">
         <button
           type="button"
-          onClick={() => setOpenPath(open ? null : key)}
+          onClick={() => setOpenPath(open ? null : pathKey)}
           className="no-print font-mono text-[10px] text-muted-foreground hover:text-canopy"
         >
           {open ? "✕ Cancel" : "↳ Reply"}
@@ -175,10 +216,10 @@ function CommentNode({
               : "mt-2.5 space-y-2"
           }
         >
-          {comment.replies.map((r, i) => (
+          {comment.replies.map((reply, i) => (
             <CommentNode
-              key={`${r.name}-${r.at}-${i}`}
-              comment={r}
+              key={`${reply.name}-${reply.at}-${i}`}
+              comment={reply}
               path={[...path, i]}
               depth={depth + 1}
               openPath={openPath}
@@ -193,11 +234,11 @@ function CommentNode({
 }
 
 export function Comments({ alertId }: CommentsProps) {
-  const key = `simontini-comments-${alertId}`;
+  const storageKey = `simontini-comments-${alertId}`;
   // ponytail: localStorage per alert; swap for an API when a backend exists
   const [comments, setComments] = useState<Comment[]>(() => {
     try {
-      return normalize(JSON.parse(localStorage.getItem(key) || "[]"));
+      return parseStored(localStorage.getItem(storageKey));
     } catch {
       return [];
     }
@@ -207,7 +248,8 @@ export function Comments({ alertId }: CommentsProps) {
   const persist = (next: Comment[]) => {
     setComments(next);
     try {
-      localStorage.setItem(key, JSON.stringify(next));
+      const envelope: StoredComments = { v: COMMENTS_SCHEMA_VERSION, comments: next };
+      localStorage.setItem(storageKey, JSON.stringify(envelope));
     } catch {
       /* storage may be unavailable */
     }
@@ -235,10 +277,10 @@ export function Comments({ alertId }: CommentsProps) {
             No comments yet. Add field observations or context below.
           </p>
         ) : (
-          comments.map((c, i) => (
+          comments.map((comment, i) => (
             <CommentNode
-              key={`${c.name}-${c.at}-${i}`}
-              comment={c}
+              key={`${comment.name}-${comment.at}-${i}`}
+              comment={comment}
               path={[i]}
               depth={0}
               openPath={openPath}

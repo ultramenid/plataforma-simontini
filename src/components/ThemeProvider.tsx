@@ -22,8 +22,8 @@ const STORAGE_KEY = "simontini-theme";
 const TRANSITION_MS = 320;
 const VALID_THEMES: string[] = ["light", "dark", "system"];
 
-function isTheme(v: unknown): v is Theme {
-  return typeof v === "string" && VALID_THEMES.includes(v);
+function isTheme(value: unknown): value is Theme {
+  return typeof value === "string" && VALID_THEMES.includes(value);
 }
 
 function readStoredTheme(): Theme {
@@ -73,15 +73,15 @@ function prefersReducedMotion(): boolean {
   }
 }
 
-function withTransition(root: HTMLElement, fn: () => void) {
+function withTransition(root: HTMLElement, apply: () => void) {
   if (prefersReducedMotion()) {
-    fn();
+    apply();
     return;
   }
   root.classList.add("theme-transitioning");
   // Force the transition styles to apply before the theme value changes.
   requestAnimationFrame(() => {
-    fn();
+    apply();
     window.setTimeout(
       () => root.classList.remove("theme-transitioning"),
       TRANSITION_MS,
@@ -105,11 +105,11 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     } catch {
       return; // sandboxed iframe or unsupported; skip live tracking
     }
-    const listener = (e: MediaQueryListEvent) => {
-      setSysDark(e.matches);
+    const listener = (event: MediaQueryListEvent) => {
+      setSysDark(event.matches);
       if (theme !== "system") return;
       const root = window.document.documentElement;
-      withTransition(root, () => applyResolved(e.matches ? "dark" : "light"));
+      withTransition(root, () => applyResolved(event.matches ? "dark" : "light"));
     };
     media.addEventListener("change", listener);
     return () => media.removeEventListener("change", listener);
@@ -128,7 +128,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     withTransition(root, () => applyResolved(resolveTheme(theme, sysDark)));
     // sysDark intentionally excluded: this effect only reacts to user-driven
     // theme changes; the OS-preference listener handles system-dark shifts.
-    // eslint-disable-next-line react-hooks/exhaustive-deps, react-doctor/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme]);
 
   // Derive `resolved` from `theme` + `sysDark` instead of mirroring it in

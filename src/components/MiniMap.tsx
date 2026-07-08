@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Map, {
   Layer,
   Source,
   type MapRef,
 } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { LngLatBounds, type StyleSpecification } from "maplibre-gl";
+import { type StyleSpecification } from "maplibre-gl";
 
-import { SEVERITY_COLOR, toLngLat } from "@/lib/data";
+import { BASEMAP, SEVERITY_COLOR, boundsOfRing } from "@/lib/data";
 import type { Polygon, Severity } from "@/lib/types";
 
 interface MiniMapProps {
@@ -22,47 +22,38 @@ const SAT_STYLE: StyleSpecification = {
     sat: {
       type: "raster",
       tileSize: 256,
-      tiles: [
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      ],
-      attribution: "Imagery © Esri",
+      tiles: [...BASEMAP.sat.tiles],
+      attribution: BASEMAP.sat.attribution,
     },
   },
   layers: [{ id: "sat", type: "raster", source: "sat" }],
 };
 
 export function MiniMap({ geometry, severity, center }: MiniMapProps) {
-  const ref = useRef<MapRef>(null);
-  const [err, setErr] = useState(false);
+  const mapRef = useRef<MapRef>(null);
+  const [hasError, setHasError] = useState(false);
 
-  function fitToPolygon() {
-    const map = ref.current?.getMap();
+  const fitToPolygon = useCallback(() => {
+    const map = mapRef.current?.getMap();
     if (!map) return;
     const ring = geometry.coordinates[0];
     if (!ring || ring.length === 0) return;
-    const first = toLngLat(ring[0]);
-    const bounds = ring.reduce(
-      (b, c) => b.extend(toLngLat(c)),
-      new LngLatBounds(first, first),
-    );
-    map.fitBounds(bounds, { padding: 50, duration: 0 });
-  }
+    map.fitBounds(boundsOfRing(ring), { padding: 50, duration: 0 });
+  }, [geometry]);
 
   useEffect(() => {
     fitToPolygon();
-    // fitToPolygon is a mount-only fit; deps are intentionally empty.
-    // eslint-disable-next-line react-hooks/exhaustive-deps, react-doctor/exhaustive-deps
-  }, []);
+  }, [fitToPolygon]);
 
   return (
     <div className="minimap-wrap relative min-h-[280px] overflow-hidden rounded-md border border-line">
       <Map
-        ref={ref}
+        ref={mapRef}
         mapStyle={SAT_STYLE}
         initialViewState={{ longitude: center[0], latitude: center[1], zoom: 10 }}
         interactiveLayerIds={[]}
         onLoad={fitToPolygon}
-        onError={() => setErr(true)}
+        onError={() => setHasError(true)}
         attributionControl={false}
         style={{ position: "absolute", inset: 0 }}
       >
@@ -72,7 +63,7 @@ export function MiniMap({ geometry, severity, center }: MiniMapProps) {
           data={{ type: "Feature" as const, properties: {}, geometry }}
         >
           <Layer
-            id="f"
+            id="alert-fill"
             type="fill"
             paint={{
               "fill-color": SEVERITY_COLOR[severity],
@@ -80,7 +71,7 @@ export function MiniMap({ geometry, severity, center }: MiniMapProps) {
             }}
           />
           <Layer
-            id="l"
+            id="alert-line"
             type="line"
             paint={{
               "line-color": SEVERITY_COLOR[severity],
@@ -89,7 +80,7 @@ export function MiniMap({ geometry, severity, center }: MiniMapProps) {
           />
         </Source>
       </Map>
-      {err && (
+      {hasError && (
         <div className="absolute inset-0 flex items-center justify-center p-4 text-muted-foreground">
           Location map needs WebGL. Coordinates: {center[1].toFixed(3)},{" "}
           {center[0].toFixed(3)}

@@ -16,11 +16,7 @@ export interface Crossing {
   ha: number;
 }
 
-export interface CrosscutItem {
-  type: CrossingType;
-  name: string;
-  ha: number;
-}
+export type CrosscutItem = Crossing;
 
 export interface AlertStory {
   title: string;

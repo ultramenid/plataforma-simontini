@@ -1,8 +1,8 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Check, Code, FileText, Share2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useCopyToClipboard } from "@/lib/use-copy-to-clipboard";
 import {
   Tooltip,
   TooltipContent,
@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/tooltip";
 import { BeforeAfterCompare } from "@/components/BeforeAfterCompare";
 import { CROSSING_COLOR, fmtDate } from "@/lib/data";
+import { buildAlertUrl } from "@/lib/alert-url";
 import type { Alert } from "@/lib/types";
 
 interface AlertCardProps {
@@ -19,24 +20,24 @@ interface AlertCardProps {
   onEmbed: (id: string) => void;
 }
 
-function Fact({ k, v }: { k: string; v: string }) {
+function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <div className="mb-[3px] text-[10px] font-medium uppercase tracking-[0.04em] text-muted-foreground">
-        {k}
+        {label}
       </div>
-      <div className="text-[13px] font-medium text-foreground">{v}</div>
+      <div className="text-[13px] font-medium text-foreground">{value}</div>
     </div>
   );
 }
 
-function DateCell({ k, v }: { k: string; v: string }) {
+function DateCell({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <span className="text-[10px] font-medium uppercase tracking-[0.04em] text-muted-foreground">
-        {k}
+        {label}
       </span>
-      <div className="text-[10px] font-medium text-foreground">{v}</div>
+      <div className="text-[10px] font-medium text-foreground">{value}</div>
     </div>
   );
 }
@@ -73,21 +74,38 @@ function CrossingRow({
   );
 }
 
+/** Shared facts grid — rendered in both the main card and the embed bar. */
+function AlertFacts({ alert }: { alert: Alert }) {
+  return (
+    <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-xs">
+      <Fact label="Code" value={alert.id} />
+      <Fact label="Area" value={`${alert.ha.toLocaleString()} ha`} />
+      <Fact label="Island" value={alert.island || "—"} />
+      <Fact label="Province" value={alert.province || "—"} />
+      <Fact label="District" value={alert.district || "—"} />
+      <Fact label="Original Source" value={alert.originalSource} />
+    </div>
+  );
+}
+
+/** Shared crossings list — rendered in both the main card and the embed bar. */
+function AlertCrossings({ alert, className }: { alert: Alert; className?: string }) {
+  return (
+    <ul className={`list-none space-y-0 p-0 text-xs ${className ?? ""}`}>
+      {alert.crossings.map((crossing, i) => (
+        <CrossingRow key={`${crossing.type}-${crossing.name}`} crossing={crossing} first={i === 0} />
+      ))}
+    </ul>
+  );
+}
+
 export function AlertCard({ alert, embed, onClose, onEmbed }: AlertCardProps) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
   if (!alert) return null;
 
-  const shareUrl = `${window.location.origin}${window.location.pathname}?alert=${alert.id}`;
+  const shareUrl = buildAlertUrl(alert.id);
 
-  const handleShare = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-    } catch {
-      /* clipboard may be unavailable; the URL is still shown via embed */
-    }
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
-  };
+  const handleShare = () => copy(shareUrl);
 
   if (embed) {
     return <EmbedBar alert={alert} copied={copied} onShare={handleShare} />;
@@ -114,40 +132,29 @@ export function AlertCard({ alert, embed, onClose, onEmbed }: AlertCardProps) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        <div className="mb-3 grid grid-cols-2 gap-x-3 gap-y-2.5 text-xs">
-          <Fact k="Code" v={alert.id} />
-          <Fact k="Area" v={`${alert.ha.toLocaleString()} ha`} />
-          <Fact k="Islands" v={alert.island || "—"} />
-          <Fact k="Provinces" v={alert.province || "—"} />
-          <Fact k="Districts" v={alert.district || "—"} />
-          <Fact k="Original Source" v={alert.originalSource} />
-        </div>
+        <AlertFacts alert={alert} />
 
         <BeforeAfterCompare
           before={alert.before}
           after={alert.after}
           beforeLabel="Before · 2025"
           afterLabel={`After · ${alert.date.slice(0, 4)}`}
-          className="mb-3"
+          className="mb-3 mt-4"
         />
 
         <div className="mb-3 grid grid-cols-2 gap-2 text-[10px] text-muted-foreground">
-          <DateCell k="Before" v="2025" />
-          <DateCell k="After" v={fmtDate(alert.date)} />
+          <DateCell label="Before" value="2025" />
+          <DateCell label="After" value={fmtDate(alert.date)} />
         </div>
         <div className="mb-3 grid grid-cols-2 gap-2 text-[10px] text-muted-foreground">
-          <DateCell k="Detected" v={fmtDate(alert.date)} />
-          <DateCell k="Published" v={fmtDate(alert.publishedDate)} />
+          <DateCell label="Detected" value={fmtDate(alert.date)} />
+          <DateCell label="Published" value={fmtDate(alert.publishedDate)} />
         </div>
 
         <div className="mb-[8px] text-[10px] font-semibold uppercase tracking-[0.05em] text-canopy">
           Alert crossings
         </div>
-        <ul className="mb-3 list-none space-y-0 p-0 text-xs">
-          {alert.crossings.map((c, i) => (
-            <CrossingRow key={`${c.type}-${c.name}`} crossing={c} first={i === 0} />
-          ))}
-        </ul>
+        <AlertCrossings alert={alert} className="mb-3" />
 
         <div className="flex items-center gap-2 border-t border-line pt-3">
           <Button asChild className="flex-1 text-[11px]">
@@ -225,14 +232,14 @@ function EmbedBar({
       <div
         className={`grid shrink-0 grid-cols-2 content-center gap-x-6 gap-y-2.5 self-stretch ${divider}`}
       >
-        <Fact k="Code" v={alert.id} />
-        <Fact k="Area" v={`${alert.ha.toLocaleString()} ha`} />
-        <Fact k="Islands" v={alert.island || "—"} />
-        <Fact k="Provinces" v={alert.province || "—"} />
-        <Fact k="Districts" v={alert.district || "—"} />
-        <Fact k="Original Source" v={alert.originalSource} />
-        <Fact k="Detected" v={fmtDate(alert.date)} />
-        <Fact k="Published" v={fmtDate(alert.publishedDate)} />
+        <Fact label="Code" value={alert.id} />
+        <Fact label="Area" value={`${alert.ha.toLocaleString()} ha`} />
+        <Fact label="Island" value={alert.island || "—"} />
+        <Fact label="Province" value={alert.province || "—"} />
+        <Fact label="District" value={alert.district || "—"} />
+        <Fact label="Original Source" value={alert.originalSource} />
+        <Fact label="Detected" value={fmtDate(alert.date)} />
+        <Fact label="Published" value={fmtDate(alert.publishedDate)} />
       </div>
 
       <div
@@ -242,11 +249,7 @@ function EmbedBar({
           Alert crossings
         </div>
         {/* max-h fits the 4 crossings every alert has today; scroll is a backstop */}
-        <ul className="max-h-48 list-none space-y-0 overflow-y-auto p-0 text-xs">
-          {alert.crossings.map((c, i) => (
-            <CrossingRow key={`${c.type}-${c.name}`} crossing={c} first={i === 0} />
-          ))}
-        </ul>
+        <AlertCrossings alert={alert} className="max-h-48 overflow-y-auto" />
       </div>
 
       <div

@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { useCopyToClipboard } from "@/lib/use-copy-to-clipboard";
 
 interface EmbedDialogProps {
   open: boolean;
@@ -18,17 +17,7 @@ interface EmbedDialogProps {
 }
 
 export function EmbedDialog({ open, onOpenChange, code }: EmbedDialogProps) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(code);
-    } catch {
-      /* clipboard unavailable */
-    }
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
-  };
+  const { copied, copy } = useCopyToClipboard();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -50,7 +39,9 @@ export function EmbedDialog({ open, onOpenChange, code }: EmbedDialogProps) {
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          <Button onClick={handleCopy}>{copied ? "Copied ✓" : "Copy code"}</Button>
+          <Button onClick={() => copy(code)}>
+            {copied ? "Copied ✓" : "Copy code"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
