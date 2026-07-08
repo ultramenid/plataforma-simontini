@@ -79,7 +79,10 @@ function OverlapStack({ alert }: { alert: Alert }) {
             key={`${c.type}-${c.name}`}
             className="overlap-band"
             style={
-              { ["--band-color" as string]: color, minHeight: height } as React.CSSProperties
+              {
+                ["--band-color" as string]: color,
+                minHeight: height,
+              } as React.CSSProperties
             }
           >
             <span className="swatch" />
@@ -106,18 +109,12 @@ export function ReportPage() {
   const { copied, copy } = useCopyToClipboard();
 
   useEffect(() => {
-    document.body.style.overflow = "auto";
-    document.body.style.height = "auto";
     if (alert) document.title = `${alert.id} · ${alert.region} — Simontini`;
-    return () => {
-      document.body.style.overflow = "";
-      document.body.style.height = "";
-    };
   }, [alert]);
 
   if (!alert) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-16 text-center">
+      <div className="flex min-h-screen w-full items-center justify-center bg-background p-16 text-center">
         <div>
           <h1 className="mb-2 text-2xl font-semibold">Alert not found</h1>
           <p className="text-[13px] text-muted-foreground">
@@ -136,7 +133,7 @@ export function ReportPage() {
   const handleShare = () => copy(window.location.href);
 
   return (
-    <>
+    <div className="min-h-screen w-full bg-background">
       <header className="no-print sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-card px-4 py-3">
         <Link to="/" className="inline-flex">
           <img
@@ -219,7 +216,10 @@ export function ReportPage() {
           <div className="grid gap-y-3 md:grid-cols-3">
             <FactBlock kicker="Location">
               <FactCell label="Code" value={alert.id} />
-              <FactCell label="Area" value={`${alert.ha.toLocaleString()} ha`} />
+              <FactCell
+                label="Area"
+                value={`${alert.ha.toLocaleString()} ha`}
+              />
               <FactCell label="Country" value={alert.country} />
               <FactCell label="Province" value={alert.province || "—"} />
               <FactCell label="District" value={alert.district || "—"} />
@@ -243,7 +243,10 @@ export function ReportPage() {
               <FactCell label="Before image" value="2025" />
               <FactCell label="After image" value={fmtDate(alert.date)} />
               <FactCell label="Detected" value={fmtDate(alert.date)} />
-              <FactCell label="Published" value={fmtDate(alert.publishedDate)} />
+              <FactCell
+                label="Published"
+                value={fmtDate(alert.publishedDate)}
+              />
             </FactBlock>
           </div>
         </section>
@@ -266,8 +269,7 @@ export function ReportPage() {
                     <span
                       className="mr-1.5 inline-block size-[9px] rounded-[2px] align-middle"
                       style={{
-                        background:
-                          CROSSING_COLOR[crossing.type] || "#8ea395",
+                        background: CROSSING_COLOR[crossing.type] || "#8ea395",
                       }}
                     />
                     <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em]">
@@ -307,9 +309,7 @@ export function ReportPage() {
                 {alert.story.body.length > 1 && (
                   <div className="body">
                     {alert.story.body.slice(1).map((paragraph, i) => (
-                      <p key={`${i}-${paragraph.slice(0, 20)}`}>
-                        {paragraph}
-                      </p>
+                      <p key={`${i}-${paragraph.slice(0, 20)}`}>{paragraph}</p>
                     ))}
                   </div>
                 )}
@@ -391,6 +391,6 @@ export function ReportPage() {
           <Comments alertId={alert.id} />
         </ErrorBoundary>
       </main>
-    </>
+    </div>
   );
 }
