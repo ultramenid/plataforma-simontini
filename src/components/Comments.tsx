@@ -29,7 +29,10 @@ interface StoredComments {
 function normalize(rawComments: unknown): Comment[] {
   if (!Array.isArray(rawComments)) return [];
   return rawComments
-    .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === "object")
+    .filter(
+      (entry): entry is Record<string, unknown> =>
+        !!entry && typeof entry === "object",
+    )
     .map((entry) => ({
       name: String(entry.name ?? ""),
       text: String(entry.text ?? ""),
@@ -84,7 +87,10 @@ function addReply(list: Comment[], path: number[], reply: Comment): Comment[] {
 }
 
 function countAll(list: Comment[]): number {
-  return list.reduce((total, comment) => total + 1 + countAll(comment.replies), 0);
+  return list.reduce(
+    (total, comment) => total + 1 + countAll(comment.replies),
+    0,
+  );
 }
 
 function CommentForm({
@@ -178,7 +184,7 @@ function CommentNode({
         <button
           type="button"
           onClick={() => setOpenPath(open ? null : pathKey)}
-          className="no-print font-mono text-[10px] text-muted-foreground hover:text-canopy"
+          className="no-print cursor-pointer font-mono text-[10px] text-muted-foreground hover:text-canopy"
         >
           {open ? "✕ Cancel" : "↳ Reply"}
         </button>
@@ -248,7 +254,10 @@ export function Comments({ alertId }: CommentsProps) {
   const persist = (next: Comment[]) => {
     setComments(next);
     try {
-      const envelope: StoredComments = { v: COMMENTS_SCHEMA_VERSION, comments: next };
+      const envelope: StoredComments = {
+        v: COMMENTS_SCHEMA_VERSION,
+        comments: next,
+      };
       localStorage.setItem(storageKey, JSON.stringify(envelope));
     } catch {
       /* storage may be unavailable */
@@ -260,7 +269,9 @@ export function Comments({ alertId }: CommentsProps) {
   };
 
   const reply = (path: number[], name: string, text: string) => {
-    persist(addReply(comments, path, { name, text, at: Date.now(), replies: [] }));
+    persist(
+      addReply(comments, path, { name, text, at: Date.now(), replies: [] }),
+    );
     setOpenPath(null);
   };
 
@@ -268,9 +279,7 @@ export function Comments({ alertId }: CommentsProps) {
 
   return (
     <section className="discussion mb-7">
-      <h2 className="report-h2">
-        Discussion{total > 0 && ` · ${total}`}
-      </h2>
+      <h2 className="report-h2">Discussion{total > 0 && ` · ${total}`}</h2>
       <div className="mb-3 space-y-2.5">
         {comments.length === 0 ? (
           <p className="text-[13px] text-muted-foreground">
